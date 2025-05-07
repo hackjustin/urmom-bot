@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  urmom-bot:
+    build: .
+    container_name: urmom-bot
+    env_file:
+      - .env
+    volumes:
+      - ./gifs:/app/gifs
+    restart: unless-stopped
