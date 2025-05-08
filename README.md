@@ -23,7 +23,7 @@ A simple Discord bot that responds to specific phrases with GIFs and reactions.
    DISCORD_TOKEN=your_token_here
    ```
 
-2. Configure bot behavior in the `BotConfig` class in `refactored_urmom_bot.py`
+2. Configure bot behavior in the `BotConfig` class in `urmom-bot.py`
 
 ### Building and Running with Docker
 
