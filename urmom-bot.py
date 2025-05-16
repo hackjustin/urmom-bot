@@ -153,38 +153,37 @@ class ReminderManager:
         """Parse absolute time expressions like 'at 5pm' or '14:30'"""
         try:
             # Try to parse with dateutil's parser
-            try:
-                parsed_time = parser.parse(time_str, fuzzy=True)
-                logger.info(f"Parser result: {parsed_time}, type: {type(parsed_time)}")
-                
-                # Make sure it's a datetime object
-                if not isinstance(parsed_time, datetime.datetime):
-                    logger.warning(f"Parsed time is not a datetime object: {parsed_time}")
-                    return None
-                
-                # If only time is specified (no date), use today's date
-                if parsed_time.year == 1900:
-                    logger.info("Detected time-only value, combining with today's date")
-                    # Combine current date with parsed time
-                    parsed_time = datetime.datetime.combine(
-                        now.date(),
-                        parsed_time.time()
-                    )
-                    # Add timezone info
-                    parsed_time = self.est_timezone.localize(parsed_time)
-                    
-                    # If the parsed time is earlier than now, assume tomorrow
-                    if parsed_time < now:
-                        logger.info("Time is in the past, assuming tomorrow")
-                        parsed_time = parsed_time + datetime.timedelta(days=1)
-                else:
-                    # If it already has a date, just add timezone
-                    if parsed_time.tzinfo is None:
-                        logger.info("Adding timezone info to datetime")
-                        parsed_time = self.est_timezone.localize(parsed_time)
-                
-                return parsed_time
+            parsed_time = parser.parse(time_str, fuzzy=True)
+            logger.info(f"Parser result: {parsed_time}, type: {type(parsed_time)}")
             
+            # Make sure it's a datetime object
+            if not isinstance(parsed_time, datetime.datetime):
+                logger.warning(f"Parsed time is not a datetime object: {parsed_time}")
+                return None
+            
+            # If only time is specified (no date), use today's date
+            if parsed_time.year == 1900:
+                logger.info("Detected time-only value, combining with today's date")
+                # Combine current date with parsed time
+                parsed_time = datetime.datetime.combine(
+                    now.date(),
+                    parsed_time.time()
+                )
+                # Add timezone info
+                parsed_time = self.est_timezone.localize(parsed_time)
+                
+                # If the parsed time is earlier than now, assume tomorrow
+                if parsed_time < now:
+                    logger.info("Time is in the past, assuming tomorrow")
+                    parsed_time = parsed_time + datetime.timedelta(days=1)
+            else:
+                # If it already has a date, just add timezone
+                if parsed_time.tzinfo is None:
+                    logger.info("Adding timezone info to datetime")
+                    parsed_time = self.est_timezone.localize(parsed_time)
+            
+            return parsed_time
+        
         except (ValueError, parser.ParserError) as e:
             logger.error(f"Error parsing absolute time: {e}")
             return None
