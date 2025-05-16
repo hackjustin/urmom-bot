@@ -9,6 +9,7 @@ import datetime
 import pytz
 import re
 from dateutil import parser
+import traceback
 
 # Setup logging
 logging.basicConfig(
@@ -100,46 +101,93 @@ class ReminderManager:
     def parse_time(self, time_str):
         """Parse a time string into a datetime object"""
         now = datetime.datetime.now(self.est_timezone)
+        logger.info(f"Parsing time: {time_str} (Current time EST: {now})")
         
-        # Check for relative time format (e.g., "in 5 minutes", "in 2 hours")
-        relative_match = re.match(r'(?:in\s+)?(\d+)\s+(second|minute|hour|day|week)s?', time_str, re.IGNORECASE)
-        if relative_match:
-            amount = int(relative_match.group(1))
-            unit = relative_match.group(2).lower()
+        # First try to parse as a relative time
+        relative_time = self._parse_relative_time(time_str, now)
+        if relative_time:
+            logger.info(f"Parsed as relative time: {relative_time}")
+            return relative_time
             
-            if unit.startswith('second'):
-                delta = datetime.timedelta(seconds=amount)
-            elif unit.startswith('minute'):
-                delta = datetime.timedelta(minutes=amount)
-            elif unit.startswith('hour'):
-                delta = datetime.timedelta(hours=amount)
-            elif unit.startswith('day'):
-                delta = datetime.timedelta(days=amount)
-            elif unit.startswith('week'):
-                delta = datetime.timedelta(weeks=amount)
+        # Then try to parse as an absolute time
+        absolute_time = self._parse_absolute_time(time_str, now)
+        if absolute_time:
+            logger.info(f"Parsed as absolute time: {absolute_time}")
+            return absolute_time
             
-            return now + delta
+        logger.warning(f"Failed to parse time: {time_str}")
+        return None
         
-        # Check for absolute time format (e.g., "at 5pm", "at 14:30")
-        at_match = re.match(r'(?:at\s+)?(.*)', time_str, re.IGNORECASE)
-        if at_match:
-            time_text = at_match.group(1)
-            try:
-                parsed_time = parser.parse(time_text, fuzzy=True)
-                
-                # If only time is specified (no date), use today's date
-                if parsed_time.date() == datetime.datetime.today().date():
-                    # If the parsed time is earlier than now, assume tomorrow
-                    if parsed_time.time() < now.time():
-                        parsed_time = parsed_time + datetime.timedelta(days=1)
-                
-                # Convert to EST timezone
-                return parsed_time.replace(tzinfo=self.est_timezone)
-                
-            except ValueError:
-                return None
+    def _parse_relative_time(self, time_str, now):
+        """Parse relative time expressions like '5 minutes' or '2 hours'"""
+        # Handle direct number followed by time unit
+        time_units = {
+            "sec": "seconds", "secs": "seconds", "second": "seconds", "seconds": "seconds",
+            "min": "minutes", "mins": "minutes", "minute": "minutes", "minutes": "minutes",
+            "hr": "hours", "hrs": "hours", "hour": "hours", "hours": "hours",
+            "day": "days", "days": "days",
+            "week": "weeks", "weeks": "weeks"
+        }
+        
+        # First pattern: number followed by unit (with optional 'in')
+        # Examples: "5 minutes", "in 2 hours", "3 days"
+        pattern = r'(?:in\s+)?(\d+)\s+([a-zA-Z]+)'
+        match = re.match(pattern, time_str.lower().strip())
+        
+        if match:
+            amount = int(match.group(1))
+            unit_raw = match.group(2).lower().strip()
+            
+            # Handle plural/singular and abbreviations
+            unit = time_units.get(unit_raw)
+            
+            if unit:
+                # Create timedelta based on unit
+                delta_args = {unit: amount}
+                delta = datetime.timedelta(**delta_args)
+                return now + delta
         
         return None
+        
+    def _parse_absolute_time(self, time_str, now):
+        """Parse absolute time expressions like 'at 5pm' or '14:30'"""
+        try:
+            # Try to parse with dateutil's parser
+            try:
+                parsed_time = parser.parse(time_str, fuzzy=True)
+                logger.info(f"Parser result: {parsed_time}, type: {type(parsed_time)}")
+                
+                # Make sure it's a datetime object
+                if not isinstance(parsed_time, datetime.datetime):
+                    logger.warning(f"Parsed time is not a datetime object: {parsed_time}")
+                    return None
+                
+                # If only time is specified (no date), use today's date
+                if parsed_time.year == 1900:
+                    logger.info("Detected time-only value, combining with today's date")
+                    # Combine current date with parsed time
+                    parsed_time = datetime.datetime.combine(
+                        now.date(),
+                        parsed_time.time()
+                    )
+                    # Add timezone info
+                    parsed_time = self.est_timezone.localize(parsed_time)
+                    
+                    # If the parsed time is earlier than now, assume tomorrow
+                    if parsed_time < now:
+                        logger.info("Time is in the past, assuming tomorrow")
+                        parsed_time = parsed_time + datetime.timedelta(days=1)
+                else:
+                    # If it already has a date, just add timezone
+                    if parsed_time.tzinfo is None:
+                        logger.info("Adding timezone info to datetime")
+                        parsed_time = self.est_timezone.localize(parsed_time)
+                
+                return parsed_time
+            
+        except (ValueError, parser.ParserError) as e:
+            logger.error(f"Error parsing absolute time: {e}")
+            return None
 
 class UrmomBot(commands.Bot):
     def __init__(self):
@@ -231,12 +279,10 @@ class UrmomBot(commands.Bot):
                             actors = movie.get('Actors', 'N/A').split(', ')[:2]  # Get first two actors
                             actors_str = ', '.join(actors) if len(actors) > 0 else 'N/A'
                             director = movie.get('Director', 'N/A')
-                            production = movie.get('Production', 'N/A')
                             
                             selection_msg += f"**{i+1}.** {movie['Title']} ({year})\n"
                             selection_msg += f"   Actors: {actors_str}\n"
-                            selection_msg += f"   Director: {director}\n"
-                            selection_msg += f"   Studio: {production}\n\n"
+                            selection_msg += f"   Director: {director}\n\n"
                         
                         # Store the results for selection
                         self.movie_selections[ctx.author.id] = [movie['imdbID'] for movie in results[:10]]
@@ -244,10 +290,9 @@ class UrmomBot(commands.Bot):
                         await ctx.send(selection_msg)
         
         @self.command(name='remind')
-        async def remind_command(ctx, time_str=None, *, message=None):
+        async def remind_command(ctx, *args):
             """Set a reminder"""
-            # If no time provided, show usage instructions
-            if not time_str:
+            if not args:
                 await ctx.send("Usage: `!remind [time] [message]`\n"
                               "Examples:\n"
                               "- `!remind 5 minutes Check the oven`\n"
@@ -256,7 +301,28 @@ class UrmomBot(commands.Bot):
                               "- `!remind tomorrow at 9am Meeting with team`")
                 return
             
-            # Check if message is provided
+            # Try to parse time from the arguments
+            # First, try to find a time pattern in the first few arguments
+            time_str = None
+            message_start_index = 0
+            
+            # Try different combinations of arguments to find a valid time
+            for i in range(min(4, len(args))):
+                potential_time_str = ' '.join(args[:i+1])
+                potential_time = self.reminder_manager.parse_time(potential_time_str)
+                if potential_time:
+                    time_str = potential_time_str
+                    message_start_index = i+1
+                    break
+            
+            if not time_str:
+                await ctx.send("I couldn't understand the time format. Please try again with a format like '5 minutes' or 'at 3pm'.")
+                return
+                
+            # Get the message (the rest of the arguments)
+            message = ' '.join(args[message_start_index:]) if message_start_index < len(args) else None
+            
+            # If no message provided, ask for one
             if not message:
                 await ctx.send("What would you like to be reminded about?")
                 
