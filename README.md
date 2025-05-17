@@ -1,33 +1,34 @@
-# Urmom Discord Bot
+Urmom Discord Bot
 
-A simple Discord bot that responds to specific phrases with GIFs and reactions.
+A simple Discord bot that responds to specific phrases with GIFs and reactions, provides movie information, and offers a reminder system.
+Features
 
-## Features
+    Responds to "ur mom" or "your mom" mentions with a GIF
+    Reacts to messages containing "alot" with emoji letters spelling "ALOT"
+    Responds to !mom command with text
+    Movie lookup via IMDB/OMDB API with the !movie command
+    Reminder system that lets users set reminders with the !remind command
 
-- Responds to "ur mom" or "your mom" mentions with a GIF
-- Reacts to messages containing "alot" with emoji letters spelling "ALOT"
-- Responds to `!mom` command with text
-- Word usage tracking feature (example implementation)
+Setup
+Prerequisites
 
-## Setup
+    Docker and Docker Compose installed
+    A Discord bot token (from Discord Developer Portal)
+    OMDB API key (from OMDB API) for movie lookups
 
-### Prerequisites
+Configuration
 
-- Docker and Docker Compose installed
-- A Discord bot token (from [Discord Developer Portal](https://discord.com/developers/applications))
+    Edit the .env file with your credentials:
 
-### Configuration
+    DISCORD_TOKEN=your_discord_token_here
+    OMDB_API_KEY=your_omdb_api_key_here
 
-1. Copy your Discord bot token to the `.env` file:
-   ```
-   DISCORD_TOKEN=your_token_here
-   ```
+    Configure bot behavior in the BotConfig class in refactored_urmom_bot.py
 
-2. Configure bot behavior in the `BotConfig` class in `urmom-bot.py`
+Building and Running with Docker
 
-### Building and Running with Docker
+bash
 
-```bash
 # Build and start the container
 docker-compose up -d
 
@@ -36,28 +37,64 @@ docker-compose logs -f
 
 # Stop the container
 docker-compose down
-```
 
-## Project Structure
+Project Structure
 
-```
 .
 ├── gifs/                  # Directory for GIF files
 │   ├── alot.gif
 │   └── ur-mom.gif
-├── urmom-bot.py           # Main bot code
+├── refactored_urmom_bot.py # Main bot code
 ├── .env                   # Environment variables
 ├── requirements.txt       # Python dependencies
 ├── Dockerfile             # Docker build instructions
 └── docker-compose.yml     # Docker Compose configuration
-```
 
-## Adding New Features
+Commands
+!mom
+
+A simple command that responds with "what...?"
+!movie [title]
+
+Searches for movies matching the given title. If multiple matches are found, displays a list with details including actors, director, and studio for selection.
+
+Example:
+
+!movie The Matrix
+
+!remind [time] [message]
+
+Sets a reminder for the specified time.
+
+Time formats:
+
+    Relative time: 5 minutes, 2 hours, 1 day, etc.
+    Absolute time: at 5pm, tomorrow at 9am, etc.
+
+If replying to another message, the reminder will include that message.
+
+Examples:
+
+!remind 15 minutes Check the oven
+!remind at 5pm Call mom
+!remind tomorrow at 9am Team meeting
+
+Adding New Features
 
 To add new features:
 
-1. For new response triggers, add handling in the `on_message` event
-2. For new commands, add them with the `@bot.command()` decorator
+    For new commands, add them with the @bot.command() decorator
+    For configuration options, add them to the BotConfig class
+
+Example: To implement a new reaction to a specific phrase:
+
+python
+
+if "some phrase" in message.content.lower():
+    await message.channel.send("Your response here")
+```. For new commands, add them with the `@bot.command()` decorator
+3. For configuration options, add them to the `BotConfig` class
+. For new commands, add them with the `@bot.command()` decorator
 3. For configuration options, add them to the `BotConfig` class
 
 Example: To implement a new reaction to a specific phrase:
@@ -65,4 +102,4 @@ Example: To implement a new reaction to a specific phrase:
 ```python
 if "some phrase" in message.content.lower():
     await message.channel.send("Your response here")
-```
+
