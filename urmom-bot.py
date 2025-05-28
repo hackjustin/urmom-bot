@@ -599,17 +599,15 @@ class UrmomBot(commands.Bot):
                     opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
                     location = "HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "AWAY"
                     
-                    game_info = f"🏒 **"
-                    if is_today:
-                        game_info += "TODAY'S GAME"
-                    else:
-                        game_info += "NEXT GAME"
-                    game_info += f"** - {formatted_date_time}\n"
+                    # Always use "NEXT GAME" regardless of timing
+                    game_info = f"🏒 **NEXT GAME** - {formatted_date_time}\n"
                     
+                    # Second line: playoff context + opponent info
+                    second_line = ""
                     if is_playoff:
-                        game_info += f"Conference Finals\n"
-                    
-                    game_info += f"vs {opponent} ({location})"
+                        second_line += "Conference Finals "
+                    second_line += f"vs {opponent} ({location})"
+                    game_info += second_line
                     
                     if venue:
                         game_info += f"\n📍 {venue}"
@@ -662,10 +660,16 @@ class UrmomBot(commands.Bot):
                     game_id = next_game.get('id', '')
                     is_playoff = game_id and '03' in str(game_id)
                     
+                    # Always use "NEXT GAME"
                     game_info = f"🏒 **NEXT GAME** - {formatted_date_time}\n"
+                    
+                    # Second line: playoff context + opponent info
+                    second_line = ""
                     if is_playoff:
-                        game_info += f"Conference Finals\n"
-                    game_info += f"vs {opponent} ({location})"
+                        second_line += "Conference Finals "
+                    second_line += f"vs {opponent} ({location})"
+                    game_info += second_line
+                    
                     if venue:
                         game_info += f"\n📍 {venue}"
                     
