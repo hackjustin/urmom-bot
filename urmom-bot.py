@@ -264,13 +264,17 @@ class PanthersManager:
                     if response.status == 200:
                         data = await response.json()
                         games = data.get('games', [])
-                        now = datetime.datetime.now(pytz.utc)
+                        now_utc = datetime.datetime.now(pytz.utc)
                         
                         # Find next game
                         for game in games:
                             try:
-                                game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
-                                if game_date > now:
+                                game_date_str = game.get('gameDate', '')
+                                if not game_date_str:
+                                    continue
+                                    
+                                game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                                if game_date > now_utc:
                                     return game
                             except (ValueError, TypeError) as e:
                                 logger.warning(f"Error parsing game date: {e}")
@@ -279,7 +283,8 @@ class PanthersManager:
                         logger.warning(f"Failed to fetch next game: {response.status}")
         except Exception as e:
             logger.error(f"Error fetching next Panthers game: {e}")
-            return None
+            
+        return None
             
     async def get_recent_games(self, limit=5):
         """Get recent Panthers games"""
@@ -291,17 +296,22 @@ class PanthersManager:
                     if response.status == 200:
                         data = await response.json()
                         games = data.get('games', [])
-                        now = datetime.datetime.now(pytz.utc)
+                        now_utc = datetime.datetime.now(pytz.utc)
                         
                         # Get recent completed games
                         recent_games = []
                         for game in reversed(games):  # Start from most recent
                             try:
-                                game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
+                                game_date_str = game.get('gameDate', '')
+                                if not game_date_str:
+                                    continue
+                                    
+                                # Parse the ISO date string properly
+                                game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
                                 game_state = game.get('gameState', '')
                                 
                                 # Include completed games (OFF, FINAL) and live games that have ended
-                                if game_date < now and game_state in ['OFF', 'FINAL', 'OVER']:
+                                if game_date < now_utc and game_state in ['OFF', 'FINAL', 'OVER']:
                                     recent_games.append(game)
                                     if len(recent_games) >= limit:
                                         break
@@ -320,15 +330,19 @@ class PanthersManager:
                     if response.status == 200:
                         data = await response.json()
                         games = data.get('games', [])
-                        now = datetime.datetime.now(pytz.utc)
+                        now_utc = datetime.datetime.now(pytz.utc)
                         
                         recent_games = []
                         for game in reversed(games):
                             try:
-                                game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
+                                game_date_str = game.get('gameDate', '')
+                                if not game_date_str:
+                                    continue
+                                    
+                                game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
                                 game_state = game.get('gameState', '')
                                 
-                                if game_date < now and game_state in ['OFF', 'FINAL', 'OVER']:
+                                if game_date < now_utc and game_state in ['OFF', 'FINAL', 'OVER']:
                                     recent_games.append(game)
                                     if len(recent_games) >= limit:
                                         break
@@ -349,15 +363,19 @@ class PanthersManager:
                     if response.status == 200:
                         data = await response.json()
                         games = data.get('games', [])
-                        now = datetime.datetime.now(pytz.utc)
+                        now_utc = datetime.datetime.now(pytz.utc)
                         
                         recent_games = []
                         for game in reversed(games):
                             try:
-                                game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
+                                game_date_str = game.get('gameDate', '')
+                                if not game_date_str:
+                                    continue
+                                    
+                                game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
                                 game_state = game.get('gameState', '')
                                 
-                                if game_date < now and game_state in ['OFF', 'FINAL', 'OVER']:
+                                if game_date < now_utc and game_state in ['OFF', 'FINAL', 'OVER']:
                                     recent_games.append(game)
                                     if len(recent_games) >= limit:
                                         break
