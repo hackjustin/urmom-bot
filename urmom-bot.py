@@ -589,10 +589,24 @@ class UrmomBot(commands.Bot):
                         color=0xC8102E
                     )
                     
-                    game_date = datetime.datetime.fromisoformat(next_game.get('gameDate', '').replace('Z', '+00:00'))
-                    est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
-                    formatted_date = est_date.strftime('%A, %B %d at %I:%M %p ET')
-                    formatted_date_short = est_date.strftime('%B %d, %Y')
+                    game_date_str = next_game.get('gameDate', '')
+                    if game_date_str:
+                        try:
+                            if 'T' in game_date_str:
+                                game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                            else:
+                                date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                                game_date = pytz.utc.localize(date_part)
+                            
+                            est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
+                            formatted_date = est_date.strftime('%A, %B %d at %I:%M %p ET')
+                            formatted_date_short = est_date.strftime('%B %d, %Y')
+                        except ValueError:
+                            formatted_date = "Date TBD"
+                            formatted_date_short = "TBD"
+                    else:
+                        formatted_date = "Date TBD"
+                        formatted_date_short = "TBD"
                     
                     home_team = next_game.get('homeTeam', {})
                     away_team = next_game.get('awayTeam', {})
@@ -626,10 +640,22 @@ class UrmomBot(commands.Bot):
             opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
             location = "🏠 HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "✈️ AWAY"
             
-            # Add game date
-            game_date = datetime.datetime.fromisoformat(current_game.get('gameDate', '').replace('Z', '+00:00'))
-            est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
-            formatted_date_short = est_date.strftime('%B %d, %Y')
+            # Add game date with safe parsing
+            game_date_str = current_game.get('gameDate', '')
+            if game_date_str:
+                try:
+                    if 'T' in game_date_str:
+                        game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                    else:
+                        date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                        game_date = pytz.utc.localize(date_part)
+                    
+                    est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
+                    formatted_date_short = est_date.strftime('%B %d, %Y')
+                except ValueError:
+                    formatted_date_short = "TBD"
+            else:
+                formatted_date_short = "TBD"
             
             embed.add_field(name="Date", value=formatted_date_short, inline=True)
             embed.add_field(name="Opponent", value=f"vs {opponent}", inline=True)
@@ -656,10 +682,13 @@ class UrmomBot(commands.Bot):
                 # Pre-game
                 game_time = current_game.get('startTimeUTC', '')
                 if game_time:
-                    game_dt = datetime.datetime.fromisoformat(game_time.replace('Z', '+00:00'))
-                    est_time = game_dt.astimezone(pytz.timezone('US/Eastern'))
-                    formatted_time = est_time.strftime('%I:%M %p ET')
-                    embed.add_field(name="Game Time", value=formatted_time, inline=True)
+                    try:
+                        game_dt = datetime.datetime.fromisoformat(game_time.replace('Z', '+00:00'))
+                        est_time = game_dt.astimezone(pytz.timezone('US/Eastern'))
+                        formatted_time = est_time.strftime('%I:%M %p ET')
+                        embed.add_field(name="Game Time", value=formatted_time, inline=True)
+                    except ValueError:
+                        embed.add_field(name="Game Time", value="TBD", inline=True)
             
             venue = current_game.get('venue', {}).get('default', '')
             if venue:
