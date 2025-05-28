@@ -43,8 +43,9 @@ class BotConfig:
     NHL_API_BASE = "https://api-web.nhle.com/v1"
     NHL_STATS_API = "https://api.nhle.com/stats/rest/en"
     
-    # Panthers team ID
+    # Panthers team ID and abbreviation
     PANTHERS_TEAM_ID = 13
+    PANTHERS_TEAM_ABBREV = "FLA"
     
     # Timezone for reminders
     TIMEZONE = pytz.timezone('US/Eastern')
@@ -257,19 +258,25 @@ class PanthersManager:
         """Get next Panthers game"""
         try:
             async with aiohttp.ClientSession() as session:
-                # Get team schedule
-                url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ID}/now"
+                # Get team schedule using team abbreviation
+                url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ABBREV}/now"
                 async with session.get(url) as response:
                     if response.status == 200:
                         data = await response.json()
                         games = data.get('games', [])
-                        now = datetime.datetime.now()
+                        now = datetime.datetime.now(pytz.utc)
                         
                         # Find next game
                         for game in games:
-                            game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
-                            if game_date > now:
-                                return game
+                            try:
+                                game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
+                                if game_date > now:
+                                    return game
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Error parsing game date: {e}")
+                                continue
+                    else:
+                        logger.warning(f"Failed to fetch next game: {response.status}")
         except Exception as e:
             logger.error(f"Error fetching next Panthers game: {e}")
             return None
@@ -278,40 +285,66 @@ class PanthersManager:
         """Get recent Panthers games"""
         try:
             async with aiohttp.ClientSession() as session:
-                # Try multiple season formats to get recent games
-                season_formats = ["20242025", "now"]
+                # Use the correct team abbreviation endpoint
+                url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ABBREV}/now"
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        games = data.get('games', [])
+                        now = datetime.datetime.now(pytz.utc)
+                        
+                        # Get recent completed games
+                        recent_games = []
+                        for game in reversed(games):  # Start from most recent
+                            try:
+                                game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
+                                game_state = game.get('gameState', '')
+                                
+                                # Include completed games (OFF, FINAL) and live games that have ended
+                                if game_date < now and game_state in ['OFF', 'FINAL', 'OVER']:
+                                    recent_games.append(game)
+                                    if len(recent_games) >= limit:
+                                        break
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Error parsing game date for game {game.get('id', 'unknown')}: {e}")
+                                continue
+                        
+                        if recent_games:
+                            return recent_games
+                    else:
+                        logger.warning(f"Failed to fetch games for team {self.config.PANTHERS_TEAM_ABBREV}: {response.status}")
                 
-                for season in season_formats:
-                    url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ID}/{season}"
-                    async with session.get(url) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            games = data.get('games', [])
-                            now = datetime.datetime.now(pytz.utc)
-                            
-                            # Get recent completed games
-                            recent_games = []
-                            for game in reversed(games):  # Start from most recent
-                                try:
-                                    game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
-                                    game_state = game.get('gameState', '')
-                                    
-                                    # Include completed games (OFF, FINAL) and live games that have ended
-                                    if game_date < now and game_state in ['OFF', 'FINAL', 'OVER']:
-                                        recent_games.append(game)
-                                        if len(recent_games) >= limit:
-                                            break
-                                except (ValueError, TypeError) as e:
-                                    logger.warning(f"Error parsing game date for game {game.get('id', 'unknown')}: {e}")
-                                    continue
-                            
-                            if recent_games:
-                                return recent_games
+                # Fallback: try with specific season format
+                url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ABBREV}/20242025"
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        games = data.get('games', [])
+                        now = datetime.datetime.now(pytz.utc)
+                        
+                        recent_games = []
+                        for game in reversed(games):
+                            try:
+                                game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
+                                game_state = game.get('gameState', '')
+                                
+                                if game_date < now and game_state in ['OFF', 'FINAL', 'OVER']:
+                                    recent_games.append(game)
+                                    if len(recent_games) >= limit:
+                                        break
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Error parsing game date: {e}")
+                                continue
+                        
+                        if recent_games:
+                            return recent_games
                         else:
-                            logger.warning(f"Failed to fetch games with season {season}: {response.status}")
+                            logger.info("No completed games found in recent schedule")
+                    else:
+                        logger.warning(f"Failed to fetch 2024-2025 season schedule: {response.status}")
                 
-                # If no games found, try the team's current season endpoint
-                url = f"{self.config.NHL_API_BASE}/club-schedule/{self.config.PANTHERS_TEAM_ID}/month/now"
+                # Final fallback: try monthly schedule
+                url = f"{self.config.NHL_API_BASE}/club-schedule/{self.config.PANTHERS_TEAM_ABBREV}/month/now"
                 async with session.get(url) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -333,10 +366,13 @@ class PanthersManager:
                                 continue
                         
                         return recent_games
+                    else:
+                        logger.warning(f"Failed to fetch monthly schedule: {response.status}")
                         
         except Exception as e:
             logger.error(f"Error fetching recent Panthers games: {e}")
-            return []
+            
+        return []
 
 class UrmomBot(commands.Bot):
     def __init__(self):
