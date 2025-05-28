@@ -278,23 +278,62 @@ class PanthersManager:
         """Get recent Panthers games"""
         try:
             async with aiohttp.ClientSession() as session:
-                url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ID}/now"
+                # Try multiple season formats to get recent games
+                season_formats = ["20242025", "now"]
+                
+                for season in season_formats:
+                    url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ID}/{season}"
+                    async with session.get(url) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            games = data.get('games', [])
+                            now = datetime.datetime.now(pytz.utc)
+                            
+                            # Get recent completed games
+                            recent_games = []
+                            for game in reversed(games):  # Start from most recent
+                                try:
+                                    game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
+                                    game_state = game.get('gameState', '')
+                                    
+                                    # Include completed games (OFF, FINAL) and live games that have ended
+                                    if game_date < now and game_state in ['OFF', 'FINAL', 'OVER']:
+                                        recent_games.append(game)
+                                        if len(recent_games) >= limit:
+                                            break
+                                except (ValueError, TypeError) as e:
+                                    logger.warning(f"Error parsing game date for game {game.get('id', 'unknown')}: {e}")
+                                    continue
+                            
+                            if recent_games:
+                                return recent_games
+                        else:
+                            logger.warning(f"Failed to fetch games with season {season}: {response.status}")
+                
+                # If no games found, try the team's current season endpoint
+                url = f"{self.config.NHL_API_BASE}/club-schedule/{self.config.PANTHERS_TEAM_ID}/month/now"
                 async with session.get(url) as response:
                     if response.status == 200:
                         data = await response.json()
                         games = data.get('games', [])
-                        now = datetime.datetime.now()
+                        now = datetime.datetime.now(pytz.utc)
                         
-                        # Get recent completed games
                         recent_games = []
-                        for game in reversed(games):  # Start from most recent
-                            game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
-                            if game_date < now and game.get('gameState') == 'OFF':
-                                recent_games.append(game)
-                                if len(recent_games) >= limit:
-                                    break
+                        for game in reversed(games):
+                            try:
+                                game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
+                                game_state = game.get('gameState', '')
+                                
+                                if game_date < now and game_state in ['OFF', 'FINAL', 'OVER']:
+                                    recent_games.append(game)
+                                    if len(recent_games) >= limit:
+                                        break
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Error parsing game date: {e}")
+                                continue
                         
                         return recent_games
+                        
         except Exception as e:
             logger.error(f"Error fetching recent Panthers games: {e}")
             return []
@@ -470,6 +509,7 @@ class UrmomBot(commands.Bot):
                     game_date = datetime.datetime.fromisoformat(next_game.get('gameDate', '').replace('Z', '+00:00'))
                     est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
                     formatted_date = est_date.strftime('%A, %B %d at %I:%M %p ET')
+                    formatted_date_short = est_date.strftime('%B %d, %Y')
                     
                     home_team = next_game.get('homeTeam', {})
                     away_team = next_game.get('awayTeam', {})
@@ -477,9 +517,10 @@ class UrmomBot(commands.Bot):
                     location = "🏠 HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "✈️ AWAY"
                     venue = next_game.get('venue', {}).get('default', '')
                     
+                    embed.add_field(name="Date", value=formatted_date_short, inline=True)
                     embed.add_field(name="Opponent", value=f"vs {opponent}", inline=True)
                     embed.add_field(name="Location", value=location, inline=True)
-                    embed.add_field(name="Date & Time", value=formatted_date, inline=False)
+                    embed.add_field(name="Game Time", value=formatted_date, inline=False)
                     if venue:
                         embed.add_field(name="Venue", value=f"📍 {venue}", inline=False)
                     
@@ -502,6 +543,12 @@ class UrmomBot(commands.Bot):
             opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
             location = "🏠 HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "✈️ AWAY"
             
+            # Add game date
+            game_date = datetime.datetime.fromisoformat(current_game.get('gameDate', '').replace('Z', '+00:00'))
+            est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
+            formatted_date_short = est_date.strftime('%B %d, %Y')
+            
+            embed.add_field(name="Date", value=formatted_date_short, inline=True)
             embed.add_field(name="Opponent", value=f"vs {opponent}", inline=True)
             embed.add_field(name="Location", value=location, inline=True)
             
