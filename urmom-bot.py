@@ -627,6 +627,12 @@ class UrmomBot(commands.Bot):
                             est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
                             formatted_date = est_date.strftime('%A, %B %d at %I:%M %p ET')
                             formatted_date_short = est_date.strftime('%B %d, %Y')
+                            
+                            # Check if it's today
+                            today_est = datetime.datetime.now(pytz.timezone('US/Eastern')).date()
+                            if est_date.date() == today_est:
+                                formatted_date_short = "Today"
+                                
                         except ValueError:
                             formatted_date = "Date TBD"
                             formatted_date_short = "TBD"
@@ -666,8 +672,10 @@ class UrmomBot(commands.Bot):
             opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
             location = "🏠 HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "✈️ AWAY"
             
-            # Add game date with safe parsing
+            # Add game date with smart logic
             game_date_str = current_game.get('gameDate', '')
+            today_est = datetime.datetime.now(pytz.timezone('US/Eastern'))
+            
             if game_date_str:
                 try:
                     if 'T' in game_date_str:
@@ -677,11 +685,19 @@ class UrmomBot(commands.Bot):
                         game_date = pytz.utc.localize(date_part)
                     
                     est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
-                    formatted_date_short = est_date.strftime('%B %d, %Y')
+                    
+                    # Check if it's today
+                    if est_date.date() == today_est.date():
+                        formatted_date_short = "Today"
+                    else:
+                        formatted_date_short = est_date.strftime('%B %d, %Y')
+                        
                 except ValueError:
-                    formatted_date_short = "TBD"
+                    # If we can't parse the date but we found a current game, assume it's today
+                    formatted_date_short = "Today"
             else:
-                formatted_date_short = "TBD"
+                # If no date but we found a current game, assume it's today
+                formatted_date_short = "Today"
             
             embed.add_field(name="Date", value=formatted_date_short, inline=True)
             embed.add_field(name="Opponent", value=f"vs {opponent}", inline=True)
@@ -705,7 +721,7 @@ class UrmomBot(commands.Bot):
                     shots_display = f"{away_team.get('abbrev', 'AWAY')} {away_shots} - {home_shots} {home_team.get('abbrev', 'HOME')}"
                     embed.add_field(name="Shots on Goal", value=shots_display, inline=False)
             else:
-                # Pre-game
+                # Pre-game - try to get actual game time
                 game_time = current_game.get('startTimeUTC', '')
                 if game_time:
                     try:
@@ -714,7 +730,9 @@ class UrmomBot(commands.Bot):
                         formatted_time = est_time.strftime('%I:%M %p ET')
                         embed.add_field(name="Game Time", value=formatted_time, inline=True)
                     except ValueError:
-                        embed.add_field(name="Game Time", value="TBD", inline=True)
+                        embed.add_field(name="Game Time", value="Time TBD", inline=True)
+                else:
+                    embed.add_field(name="Game Time", value="Time TBD", inline=True)
             
             venue = current_game.get('venue', {}).get('default', '')
             if venue:
