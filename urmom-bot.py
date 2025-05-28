@@ -10,6 +10,7 @@ import pytz
 import re
 from dateutil import parser
 import traceback
+import random
 
 # Setup logging
 logging.basicConfig(
@@ -39,12 +40,32 @@ class BotConfig:
     
     # API endpoints
     OMDB_API_URL = "http://www.omdbapi.com/"
+    NHL_API_BASE = "https://api-web.nhle.com/v1"
+    NHL_STATS_API = "https://api.nhle.com/stats/rest/en"
+    
+    # Panthers team ID and abbreviation
+    PANTHERS_TEAM_ID = 13
+    PANTHERS_TEAM_ABBREV = "FLA"
     
     # Timezone for reminders
     TIMEZONE = pytz.timezone('US/Eastern')
     
     # Reminder storage
     REMINDER_CHECK_INTERVAL = 10  # seconds
+    
+    # Panthers player quotes (can be expanded)
+    PANTHERS_QUOTES = [
+        "\"We're just taking it one game at a time.\" - Aleksander Barkov",
+        "\"The fans here are incredible. We feed off their energy.\" - Matthew Tkachuk",
+        "\"This team has something special. We believe in each other.\" - Aaron Ekblad",
+        "\"Florida is a hockey state now, and we're proud to represent it.\" - Sam Reinhart",
+        "\"We play for each other and for this city.\" - Carter Verhaeghe",
+        "\"The culture here is different. We're all pulling in the same direction.\" - Gustav Forsling",
+        "\"Every shift matters. Every game matters.\" - Brandon Montour",
+        "\"We want to bring a Cup to South Florida.\" - Sergei Bobrovsky",
+        "\"The chemistry on this team is unreal.\" - Sam Bennett",
+        "\"We're not done yet. We want more.\" - Paul Maurice (Head Coach)"
+    ]
 
 class Reminder:
     """Class to represent a reminder"""
@@ -188,6 +209,244 @@ class ReminderManager:
             logger.error(f"Error parsing absolute time: {e}")
             return None
 
+class PanthersManager:
+    """Class to manage Panthers NHL data"""
+    def __init__(self, bot):
+        self.bot = bot
+        self.config = bot.config
+        
+    async def get_team_info(self):
+        """Get basic Panthers team information"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Get team stats and standings
+                url = f"{self.config.NHL_API_BASE}/standings/now"
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        # Find Panthers in standings
+                        for team in data.get('standings', []):
+                            if team.get('teamAbbrev', {}).get('default') == 'FLA':
+                                return team
+        except Exception as e:
+            logger.error(f"Error fetching Panthers team info: {e}")
+            return None
+        
+    async def get_current_game(self):
+        """Get current Panthers game if one is active or scheduled for today"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Get today's schedule
+                today = datetime.datetime.now(pytz.timezone('US/Eastern')).strftime('%Y-%m-%d')
+                url = f"{self.config.NHL_API_BASE}/schedule/{today}"
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        # Look for Panthers game
+                        for game_week in data.get('gameWeek', []):
+                            for game in game_week.get('games', []):
+                                home_team = game.get('homeTeam', {})
+                                away_team = game.get('awayTeam', {})
+                                if (home_team.get('id') == self.config.PANTHERS_TEAM_ID or 
+                                    away_team.get('id') == self.config.PANTHERS_TEAM_ID):
+                                    return game
+                
+                # Fallback: check team schedule for today's game
+                url = f"{self.config.NHL_API_BASE}/club-schedule/{self.config.PANTHERS_TEAM_ABBREV}/week/now"
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        games = data.get('games', [])
+                        today_utc = datetime.datetime.now(pytz.utc).date()
+                        
+                        for game in games:
+                            game_date_str = game.get('gameDate', '')
+                            if game_date_str:
+                                try:
+                                    if 'T' in game_date_str:
+                                        game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                                    else:
+                                        date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                                        game_date = pytz.utc.localize(date_part)
+                                    
+                                    # Check if game is today
+                                    if game_date.date() == today_utc:
+                                        return game
+                                except ValueError:
+                                    continue
+                        
+        except Exception as e:
+            logger.error(f"Error fetching current Panthers game: {e}")
+            
+        return None
+            
+    async def get_next_game(self):
+        """Get next Panthers game"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Get team schedule using team abbreviation
+                url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ABBREV}/now"
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        games = data.get('games', [])
+                        now_utc = datetime.datetime.now(pytz.utc)
+                        
+                        # Find next game
+                        for game in games:
+                            try:
+                                game_date_str = game.get('gameDate', '')
+                                if not game_date_str:
+                                    continue
+                                    
+                                game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                                if game_date > now_utc:
+                                    return game
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Error parsing game date: {e}")
+                                continue
+                    else:
+                        logger.warning(f"Failed to fetch next game: {response.status}")
+        except Exception as e:
+            logger.error(f"Error fetching next Panthers game: {e}")
+            
+        return None
+            
+    async def get_recent_games(self, limit=5):
+        """Get recent Panthers games"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Use the correct team abbreviation endpoint
+                url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ABBREV}/now"
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        games = data.get('games', [])
+                        now_utc = datetime.datetime.now(pytz.utc)
+                        
+                        # Get recent completed games
+                        recent_games = []
+                        for game in reversed(games):  # Start from most recent
+                            try:
+                                game_date_str = game.get('gameDate', '')
+                                game_state = game.get('gameState', '')
+                                
+                                if not game_date_str:
+                                    continue
+                                
+                                # Parse the ISO date string - handle different formats
+                                try:
+                                    if 'T' in game_date_str:
+                                        # Full ISO format
+                                        game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                                    else:
+                                        # Date only format - assume midnight UTC
+                                        date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                                        game_date = pytz.utc.localize(date_part)
+                                except ValueError:
+                                    continue
+                                
+                                # Include completed games - expand the list of final states
+                                final_states = ['OFF', 'FINAL', 'OVER', 'FINAL_OT', 'FINAL_SO']
+                                if game_date < now_utc and game_state in final_states:
+                                    recent_games.append(game)
+                                    if len(recent_games) >= limit:
+                                        break
+                                    
+                            except Exception as e:
+                                logger.warning(f"Error processing game {game.get('id', 'unknown')}: {e}")
+                                continue
+                        
+                        if recent_games:
+                            return recent_games
+                    else:
+                        logger.warning(f"Failed to fetch games for team {self.config.PANTHERS_TEAM_ABBREV}: {response.status}")
+                
+                # Fallback: try with specific season format
+                url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ABBREV}/20242025"
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        games = data.get('games', [])
+                        now_utc = datetime.datetime.now(pytz.utc)
+                        
+                        recent_games = []
+                        for game in reversed(games):
+                            try:
+                                game_date_str = game.get('gameDate', '')
+                                game_state = game.get('gameState', '')
+                                
+                                if not game_date_str:
+                                    continue
+                                
+                                # Parse the ISO date string
+                                try:
+                                    if 'T' in game_date_str:
+                                        game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                                    else:
+                                        date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                                        game_date = pytz.utc.localize(date_part)
+                                except ValueError:
+                                    continue
+                                
+                                final_states = ['OFF', 'FINAL', 'OVER', 'FINAL_OT', 'FINAL_SO', 'FINAL_OTHER']
+                                if game_date < now_utc and game_state in final_states:
+                                    recent_games.append(game)
+                                    if len(recent_games) >= limit:
+                                        break
+                            except Exception as e:
+                                logger.warning(f"Error parsing game: {e}")
+                                continue
+                        
+                        if recent_games:
+                            return recent_games
+                    else:
+                        logger.warning(f"Failed to fetch 2024-2025 season schedule: {response.status}")
+                
+                # Final fallback: try monthly schedule
+                url = f"{self.config.NHL_API_BASE}/club-schedule/{self.config.PANTHERS_TEAM_ABBREV}/month/now"
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        games = data.get('games', [])
+                        now_utc = datetime.datetime.now(pytz.utc)
+                        
+                        recent_games = []
+                        for game in reversed(games):
+                            try:
+                                game_date_str = game.get('gameDate', '')
+                                game_state = game.get('gameState', '')
+                                
+                                if not game_date_str:
+                                    continue
+                                
+                                try:
+                                    if 'T' in game_date_str:
+                                        game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                                    else:
+                                        date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                                        game_date = pytz.utc.localize(date_part)
+                                except ValueError:
+                                    continue
+                                
+                                final_states = ['OFF', 'FINAL', 'OVER', 'FINAL_OT', 'FINAL_SO', 'FINAL_OTHER']
+                                if game_date < now_utc and game_state in final_states:
+                                    recent_games.append(game)
+                                    if len(recent_games) >= limit:
+                                        break
+                            except Exception as e:
+                                logger.warning(f"Error parsing game: {e}")
+                                continue
+                        
+                        return recent_games
+                    else:
+                        logger.warning(f"Failed to fetch monthly schedule: {response.status}")
+                        
+        except Exception as e:
+            logger.error(f"Error fetching recent Panthers games: {e}")
+            
+        return []
+
 class UrmomBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
@@ -196,6 +455,7 @@ class UrmomBot(commands.Bot):
         
         self.config = BotConfig()
         self.reminder_manager = ReminderManager(self)
+        self.panthers_manager = PanthersManager(self)
         self.movie_selections = {}
         
         # Register commands and events
@@ -220,6 +480,334 @@ class UrmomBot(commands.Bot):
         async def mom_command(ctx):
             """Command to respond to !mom"""
             await ctx.send('what...?')
+            
+        @self.command(name='cats')
+        async def cats_command(ctx, subcommand=None):
+            """Panthers team information"""
+            if subcommand is None:
+                await self.handle_cats_main(ctx)
+            elif subcommand.lower() == 'quote':
+                await self.handle_cats_quote(ctx)
+            elif subcommand.lower() == 'game':
+                await self.handle_cats_game(ctx)
+            elif subcommand.lower() == 'recent':
+                await self.handle_cats_recent(ctx)
+            elif subcommand.lower() == 'help':
+                await self.handle_cats_help(ctx)
+            else:
+                await ctx.send("Unknown cats command. Use `!cats help` for available options.")
+        
+        async def handle_cats_main(self, ctx):
+            """Main cats command - team overview"""
+            await ctx.send("🐾 Fetching Panthers info...")
+            
+            # Get team info and current/next game
+            team_info = await self.panthers_manager.get_team_info()
+            current_game = await self.panthers_manager.get_current_game()
+            
+            embed = discord.Embed(
+                title="🐾 Florida Panthers",
+                color=0xC8102E,  # Panthers red
+                timestamp=datetime.datetime.now()
+            )
+            
+            if team_info:
+                record = f"{team_info.get('wins', 0)}-{team_info.get('losses', 0)}-{team_info.get('otLosses', 0)}"
+                points = team_info.get('points', 0)
+                games_played = team_info.get('gamesPlayed', 0)
+                
+                embed.add_field(name="Record", value=record, inline=True)
+                embed.add_field(name="Points", value=f"{points} pts", inline=True)
+                embed.add_field(name="Games Played", value=games_played, inline=True)
+                
+                # Division/Conference standing
+                division_rank = team_info.get('divisionSequence', 'N/A')
+                conference_rank = team_info.get('conferenceSequence', 'N/A')
+                league_rank = team_info.get('leagueSequence', 'N/A')
+                
+                embed.add_field(name="Atlantic Division", value=f"#{division_rank}", inline=True)
+                embed.add_field(name="Eastern Conference", value=f"#{conference_rank}", inline=True)
+                embed.add_field(name="League", value=f"#{league_rank}", inline=True)
+            
+            # Current game info
+            if current_game:
+                home_team = current_game.get('homeTeam', {})
+                away_team = current_game.get('awayTeam', {})
+                game_state = current_game.get('gameState', '')
+                
+                if game_state in ['LIVE', 'CRIT']:
+                    home_score = home_team.get('score', 0)
+                    away_score = away_team.get('score', 0)
+                    period = current_game.get('periodDescriptor', {}).get('number', '')
+                    time_remaining = current_game.get('clock', {}).get('timeRemaining', '')
+                    
+                    game_info = f"🔴 **LIVE GAME**\n"
+                    game_info += f"{away_team.get('abbrev', 'AWAY')} {away_score} - {home_score} {home_team.get('abbrev', 'HOME')}\n"
+                    game_info += f"Period {period} - {time_remaining}"
+                    
+                    embed.add_field(name="Current Game", value=game_info, inline=False)
+                else:
+                    # Game today but not started
+                    game_time = current_game.get('startTimeUTC', '')
+                    if game_time:
+                        game_dt = datetime.datetime.fromisoformat(game_time.replace('Z', '+00:00'))
+                        est_time = game_dt.astimezone(pytz.timezone('US/Eastern'))
+                        formatted_time = est_time.strftime('%I:%M %p ET')
+                        
+                        opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
+                        location = "HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "AWAY"
+                        
+                        game_info = f"🏒 **TODAY'S GAME**\n"
+                        game_info += f"vs {opponent} ({location})\n"
+                        game_info += f"{formatted_time}"
+                        
+                        embed.add_field(name="Today's Game", value=game_info, inline=False)
+            else:
+                # Get next game
+                next_game = await self.panthers_manager.get_next_game()
+                if next_game:
+                    game_date = datetime.datetime.fromisoformat(next_game.get('gameDate', '').replace('Z', '+00:00'))
+                    est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
+                    formatted_date = est_date.strftime('%a, %b %d at %I:%M %p ET')
+                    
+                    home_team = next_game.get('homeTeam', {})
+                    away_team = next_game.get('awayTeam', {})
+                    opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
+                    location = "HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "AWAY"
+                    venue = next_game.get('venue', {}).get('default', '')
+                    
+                    game_info = f"🗓️ **NEXT GAME**\n"
+                    game_info += f"vs {opponent} ({location})\n"
+                    game_info += f"{formatted_date}\n"
+                    if venue:
+                        game_info += f"📍 {venue}"
+                    
+                    embed.add_field(name="Next Game", value=game_info, inline=False)
+            
+            embed.add_field(
+                name="Commands", 
+                value="`!cats quote` - Random player quote\n`!cats game` - Detailed game info\n`!cats recent` - Recent games\n`!cats help` - All commands", 
+                inline=False
+            )
+            embed.set_footer(text="Go Panthers! 🐾")
+            
+            await ctx.send(embed=embed)
+        
+        async def handle_cats_quote(self, ctx):
+            """Random Panthers quote"""
+            quote = random.choice(self.config.PANTHERS_QUOTES)
+            embed = discord.Embed(
+                title="🐾 Panthers Quote",
+                description=quote,
+                color=0xC8102E
+            )
+            await ctx.send(embed=embed)
+        
+        async def handle_cats_game(self, ctx):
+            """Detailed game information"""
+            current_game = await self.panthers_manager.get_current_game()
+            
+            if not current_game:
+                next_game = await self.panthers_manager.get_next_game()
+                if next_game:
+                    embed = discord.Embed(
+                        title="🏒 Next Panthers Game",
+                        color=0xC8102E
+                    )
+                    
+                    game_date_str = next_game.get('gameDate', '')
+                    if game_date_str:
+                        try:
+                            if 'T' in game_date_str:
+                                game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                            else:
+                                date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                                game_date = pytz.utc.localize(date_part)
+                            
+                            est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
+                            formatted_date = est_date.strftime('%A, %B %d at %I:%M %p ET')
+                            formatted_date_short = est_date.strftime('%B %d, %Y')
+                            
+                            # Check if it's today
+                            today_est = datetime.datetime.now(pytz.timezone('US/Eastern')).date()
+                            if est_date.date() == today_est:
+                                formatted_date_short = "Today"
+                                
+                        except ValueError:
+                            formatted_date = "Date TBD"
+                            formatted_date_short = "TBD"
+                    else:
+                        formatted_date = "Date TBD"
+                        formatted_date_short = "TBD"
+                    
+                    home_team = next_game.get('homeTeam', {})
+                    away_team = next_game.get('awayTeam', {})
+                    opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
+                    location = "🏠 HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "✈️ AWAY"
+                    venue = next_game.get('venue', {}).get('default', '')
+                    
+                    embed.add_field(name="Date", value=formatted_date_short, inline=True)
+                    embed.add_field(name="Opponent", value=f"vs {opponent}", inline=True)
+                    embed.add_field(name="Location", value=location, inline=True)
+                    embed.add_field(name="Game Time", value=formatted_date, inline=False)
+                    if venue:
+                        embed.add_field(name="Venue", value=f"📍 {venue}", inline=False)
+                    
+                    await ctx.send(embed=embed)
+                else:
+                    await ctx.send("No upcoming games found!")
+                return
+            
+            # Current/today's game details
+            embed = discord.Embed(
+                title="🏒 Panthers Game",
+                color=0xC8102E
+            )
+            
+            home_team = current_game.get('homeTeam', {})
+            away_team = current_game.get('awayTeam', {})
+            game_state = current_game.get('gameState', '')
+            
+            # Basic game info
+            opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
+            location = "🏠 HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "✈️ AWAY"
+            
+            # Add game date with smart logic
+            game_date_str = current_game.get('gameDate', '')
+            today_est = datetime.datetime.now(pytz.timezone('US/Eastern'))
+            
+            if game_date_str:
+                try:
+                    if 'T' in game_date_str:
+                        game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                    else:
+                        date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                        game_date = pytz.utc.localize(date_part)
+                    
+                    est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
+                    
+                    # Check if it's today
+                    if est_date.date() == today_est.date():
+                        formatted_date_short = "Today"
+                    else:
+                        formatted_date_short = est_date.strftime('%B %d, %Y')
+                        
+                except ValueError:
+                    # If we can't parse the date but we found a current game, assume it's today
+                    formatted_date_short = "Today"
+            else:
+                # If no date but we found a current game, assume it's today
+                formatted_date_short = "Today"
+            
+            embed.add_field(name="Date", value=formatted_date_short, inline=True)
+            embed.add_field(name="Opponent", value=f"vs {opponent}", inline=True)
+            embed.add_field(name="Location", value=location, inline=True)
+            
+            if game_state in ['LIVE', 'CRIT']:
+                home_score = home_team.get('score', 0)
+                away_score = away_team.get('score', 0)
+                period = current_game.get('periodDescriptor', {}).get('number', '')
+                time_remaining = current_game.get('clock', {}).get('timeRemaining', '')
+                
+                score_display = f"{away_team.get('abbrev', 'AWAY')} {away_score} - {home_score} {home_team.get('abbrev', 'HOME')}"
+                embed.add_field(name="🔴 LIVE SCORE", value=score_display, inline=False)
+                embed.add_field(name="Period", value=period, inline=True)
+                embed.add_field(name="Time Remaining", value=time_remaining, inline=True)
+                
+                # Add shots if available
+                home_shots = home_team.get('sog', 0)
+                away_shots = away_team.get('sog', 0)
+                if home_shots or away_shots:
+                    shots_display = f"{away_team.get('abbrev', 'AWAY')} {away_shots} - {home_shots} {home_team.get('abbrev', 'HOME')}"
+                    embed.add_field(name="Shots on Goal", value=shots_display, inline=False)
+            else:
+                # Pre-game - try to get actual game time
+                game_time = current_game.get('startTimeUTC', '')
+                if game_time:
+                    try:
+                        game_dt = datetime.datetime.fromisoformat(game_time.replace('Z', '+00:00'))
+                        est_time = game_dt.astimezone(pytz.timezone('US/Eastern'))
+                        formatted_time = est_time.strftime('%I:%M %p ET')
+                        embed.add_field(name="Game Time", value=formatted_time, inline=True)
+                    except ValueError:
+                        embed.add_field(name="Game Time", value="Time TBD", inline=True)
+                else:
+                    embed.add_field(name="Game Time", value="Time TBD", inline=True)
+            
+            venue = current_game.get('venue', {}).get('default', '')
+            if venue:
+                embed.add_field(name="Venue", value=f"📍 {venue}", inline=False)
+            
+            await ctx.send(embed=embed)
+        
+        async def handle_cats_recent(self, ctx):
+            """Recent Panthers games"""
+            await ctx.send("📊 Getting recent Panthers games...")
+            
+            recent_games = await self.panthers_manager.get_recent_games()
+            
+            if not recent_games:
+                await ctx.send("No recent games found!")
+                return
+            
+            embed = discord.Embed(
+                title="🐾 Recent Panthers Games",
+                color=0xC8102E
+            )
+            
+            for game in recent_games[:5]:  # Last 5 games
+                home_team = game.get('homeTeam', {})
+                away_team = game.get('awayTeam', {})
+                
+                game_date = datetime.datetime.fromisoformat(game.get('gameDate', '').replace('Z', '+00:00'))
+                formatted_date = game_date.strftime('%m/%d')
+                
+                home_score = home_team.get('score', 0)
+                away_score = away_team.get('score', 0)
+                
+                # Determine if Panthers won
+                panthers_home = home_team.get('id') == self.config.PANTHERS_TEAM_ID
+                panthers_score = home_score if panthers_home else away_score
+                opponent_score = away_score if panthers_home else home_score
+                opponent = away_team.get('abbrev', '') if panthers_home else home_team.get('abbrev', '')
+                
+                result = "W" if panthers_score > opponent_score else "L"
+                result_emoji = "✅" if result == "W" else "❌"
+                location = "vs" if panthers_home else "@"
+                
+                game_summary = f"{result_emoji} {result} {panthers_score}-{opponent_score} {location} {opponent}"
+                embed.add_field(name=formatted_date, value=game_summary, inline=False)
+            
+            await ctx.send(embed=embed)
+        
+        async def handle_cats_help(self, ctx):
+            """Panthers commands help"""
+            embed = discord.Embed(
+                title="🐾 Panthers Commands",
+                color=0xC8102E,
+                description="All available Panthers commands"
+            )
+            
+            commands_info = [
+                ("`!cats`", "Team overview, standings, and next/current game"),
+                ("`!cats quote`", "Random player or coach quote"),
+                ("`!cats game`", "Detailed current or next game information"),
+                ("`!cats recent`", "Last 5 Panthers games with results"),
+                ("`!cats help`", "This help message")
+            ]
+            
+            for cmd, desc in commands_info:
+                embed.add_field(name=cmd, value=desc, inline=False)
+            
+            embed.set_footer(text="Go Panthers! 🐾")
+            await ctx.send(embed=embed)
+        
+        # Bind the handler methods to the class
+        self.handle_cats_main = handle_cats_main.__get__(self, UrmomBot)
+        self.handle_cats_quote = handle_cats_quote.__get__(self, UrmomBot)
+        self.handle_cats_game = handle_cats_game.__get__(self, UrmomBot)
+        self.handle_cats_recent = handle_cats_recent.__get__(self, UrmomBot)
+        self.handle_cats_help = handle_cats_help.__get__(self, UrmomBot)
         
         @self.command(name='movie')
         async def movie_command(ctx, *, query=None):
