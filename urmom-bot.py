@@ -819,7 +819,7 @@ class UrmomBot(commands.Bot):
             
             embed.add_field(
                 name="Commands", 
-                value="`!cats quote` - Random player quote\n`!cats game` - Detailed game info\n`!cats recent` - Recent games\n`!cats help` - All commands", 
+                value="`!cats quote` - Random player quote\n`!cats game` - Detailed game info\n`!cats recent` - Recent games\n`!cats live on/off/status` - 🚨 Live updates\n`!cats help` - All commands", 
                 inline=False
             )
             embed.set_footer(text="Go Panthers! 🐾")
@@ -1098,6 +1098,29 @@ class UrmomBot(commands.Bot):
             for cmd, desc in commands_info:
                 embed.add_field(name=cmd, value=desc, inline=False)
             
+        async def handle_cats_help(self, ctx):
+            """Panthers commands help"""
+            embed = discord.Embed(
+                title="🐾 Panthers Commands",
+                color=0xC8102E,
+                description="All available Panthers commands"
+            )
+            
+            commands_info = [
+                ("`!cats`", "Team overview, standings, and next/current game"),
+                ("`!cats quote`", "Random player or coach quote"),
+                ("`!cats game`", "Detailed current or next game information"),
+                ("`!cats recent`", "Last 5 Panthers games with results"),
+                ("`!cats live on/off/status`", "🚨 Toggle live game updates"),
+                ("`!cats help`", "This help message")
+            ]
+            
+            for cmd, desc in commands_info:
+                embed.add_field(name=cmd, value=desc, inline=False)
+            
+            embed.set_footer(text="Go Panthers! 🐾")
+            await ctx.send(embed=embed)
+        
         # Bind the handler methods to the class
         self.handle_cats_main = handle_cats_main.__get__(self, UrmomBot)
         self.handle_cats_quote = handle_cats_quote.__get__(self, UrmomBot)
