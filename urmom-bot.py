@@ -534,6 +534,11 @@ class UrmomBot(commands.Bot):
                 home_team = current_game.get('homeTeam', {})
                 away_team = current_game.get('awayTeam', {})
                 game_state = current_game.get('gameState', '')
+                venue = current_game.get('venue', {}).get('default', '')
+                
+                # Determine if it's a playoff game based on game ID
+                game_id = current_game.get('id', '')
+                is_playoff = game_id and '03' in str(game_id)  # Playoff games have '03' in the ID
                 
                 if game_state in ['LIVE', 'CRIT']:
                     home_score = home_team.get('score', 0)
@@ -541,34 +546,109 @@ class UrmomBot(commands.Bot):
                     period = current_game.get('periodDescriptor', {}).get('number', '')
                     time_remaining = current_game.get('clock', {}).get('timeRemaining', '')
                     
-                    game_info = f"🔴 **LIVE GAME**\n"
-                    game_info += f"{away_team.get('abbrev', 'AWAY')} {away_score} - {home_score} {home_team.get('abbrev', 'HOME')}\n"
+                    game_info = f"🔴 **LIVE GAME**"
+                    if is_playoff:
+                        game_info += f" - Conference Finals"
+                    game_info += f"\n{away_team.get('abbrev', 'AWAY')} {away_score} - {home_score} {home_team.get('abbrev', 'HOME')}\n"
                     game_info += f"Period {period} - {time_remaining}"
+                    if venue:
+                        game_info += f"\n📍 {venue}"
                     
                     embed.add_field(name="Current Game", value=game_info, inline=False)
                 else:
                     # Game today but not started
                     game_time = current_game.get('startTimeUTC', '')
+                    today_est = datetime.datetime.now(pytz.timezone('US/Eastern'))
+                    venue = current_game.get('venue', {}).get('default', '')
+                    
+                    # Check if game is today - assume it is if we found a current game
+                    game_date_str = current_game.get('gameDate', '')
+                    is_today = True  # Default to True since we found a "current" game
+                    formatted_date_time = "Today"  # Default to "Today"
+                    
+                    if game_date_str:
+                        try:
+                            if 'T' in game_date_str:
+                                game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                            else:
+                                date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                                game_date = pytz.utc.localize(date_part)
+                            
+                            est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
+                            is_today = est_date.date() == today_est.date()
+                            
+                            if is_today:
+                                formatted_date_time = "Today"
+                            else:
+                                formatted_date_time = est_date.strftime('%b %d')
+                        except ValueError:
+                            # If we can't parse the date but found a current game, assume it's today
+                            formatted_date_time = "Today"
+                            is_today = True
+                    
+                    # Add time if available
                     if game_time:
-                        game_dt = datetime.datetime.fromisoformat(game_time.replace('Z', '+00:00'))
-                        est_time = game_dt.astimezone(pytz.timezone('US/Eastern'))
-                        formatted_time = est_time.strftime('%I:%M %p ET')
-                        
-                        opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
-                        location = "HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "AWAY"
-                        
-                        game_info = f"🏒 **TODAY'S GAME**\n"
-                        game_info += f"vs {opponent} ({location})\n"
-                        game_info += f"{formatted_time}"
-                        
-                        embed.add_field(name="Today's Game", value=game_info, inline=False)
+                        try:
+                            game_dt = datetime.datetime.fromisoformat(game_time.replace('Z', '+00:00'))
+                            est_time = game_dt.astimezone(pytz.timezone('US/Eastern'))
+                            formatted_time = est_time.strftime('%I:%M %p ET')
+                            formatted_date_time += f" @ {formatted_time}"
+                        except ValueError:
+                            pass
+                    
+                    opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
+                    location = "HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "AWAY"
+                    
+                    # Always use "NEXT GAME" regardless of timing
+                    game_info = f"🏒 **NEXT GAME** - {formatted_date_time}\n"
+                    
+                    # Second line: playoff context + opponent info
+                    second_line = ""
+                    if is_playoff:
+                        second_line += "Conference Finals "
+                    second_line += f"vs {opponent} ({location})"
+                    game_info += second_line
+                    
+                    if venue:
+                        game_info += f"\n📍 {venue}"
+                    
+                    embed.add_field(name="Game Info", value=game_info, inline=False)
             else:
                 # Get next game
                 next_game = await self.panthers_manager.get_next_game()
                 if next_game:
-                    game_date = datetime.datetime.fromisoformat(next_game.get('gameDate', '').replace('Z', '+00:00'))
-                    est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
-                    formatted_date = est_date.strftime('%a, %b %d at %I:%M %p ET')
+                    game_date_str = next_game.get('gameDate', '')
+                    today_est = datetime.datetime.now(pytz.timezone('US/Eastern'))
+                    formatted_date_time = "Date TBD"
+                    
+                    if game_date_str:
+                        try:
+                            if 'T' in game_date_str:
+                                game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                            else:
+                                date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                                game_date = pytz.utc.localize(date_part)
+                            
+                            est_date = game_date.astimezone(pytz.timezone('US/Eastern'))
+                            is_today = est_date.date() == today_est.date()
+                            
+                            if is_today:
+                                formatted_date_time = "Today"
+                            else:
+                                formatted_date_time = est_date.strftime('%b %d')
+                        except ValueError:
+                            formatted_date_time = "Date TBD"
+                    
+                    # Add time if available
+                    game_time = next_game.get('startTimeUTC', '')
+                    if game_time:
+                        try:
+                            game_dt = datetime.datetime.fromisoformat(game_time.replace('Z', '+00:00'))
+                            est_time = game_dt.astimezone(pytz.timezone('US/Eastern'))
+                            formatted_time = est_time.strftime('%I:%M %p ET')
+                            formatted_date_time += f" @ {formatted_time}"
+                        except ValueError:
+                            pass
                     
                     home_team = next_game.get('homeTeam', {})
                     away_team = next_game.get('awayTeam', {})
@@ -576,13 +656,24 @@ class UrmomBot(commands.Bot):
                     location = "HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "AWAY"
                     venue = next_game.get('venue', {}).get('default', '')
                     
-                    game_info = f"🗓️ **NEXT GAME**\n"
-                    game_info += f"vs {opponent} ({location})\n"
-                    game_info += f"{formatted_date}\n"
-                    if venue:
-                        game_info += f"📍 {venue}"
+                    # Check if it's a playoff game
+                    game_id = next_game.get('id', '')
+                    is_playoff = game_id and '03' in str(game_id)
                     
-                    embed.add_field(name="Next Game", value=game_info, inline=False)
+                    # Always use "NEXT GAME"
+                    game_info = f"🏒 **NEXT GAME** - {formatted_date_time}\n"
+                    
+                    # Second line: playoff context + opponent info
+                    second_line = ""
+                    if is_playoff:
+                        second_line += "Conference Finals "
+                    second_line += f"vs {opponent} ({location})"
+                    game_info += second_line
+                    
+                    if venue:
+                        game_info += f"\n📍 {venue}"
+                    
+                    embed.add_field(name="Upcoming", value=game_info, inline=False)
             
             embed.add_field(
                 name="Commands", 
