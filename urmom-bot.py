@@ -561,10 +561,10 @@ class UrmomBot(commands.Bot):
                     today_est = datetime.datetime.now(pytz.timezone('US/Eastern'))
                     venue = current_game.get('venue', {}).get('default', '')
                     
-                    # Check if game is today
+                    # Check if game is today - assume it is if we found a current game
                     game_date_str = current_game.get('gameDate', '')
-                    is_today = False
-                    formatted_date_time = "Date TBD"
+                    is_today = True  # Default to True since we found a "current" game
+                    formatted_date_time = "Today"  # Default to "Today"
                     
                     if game_date_str:
                         try:
@@ -582,7 +582,9 @@ class UrmomBot(commands.Bot):
                             else:
                                 formatted_date_time = est_date.strftime('%b %d')
                         except ValueError:
-                            pass
+                            # If we can't parse the date but found a current game, assume it's today
+                            formatted_date_time = "Today"
+                            is_today = True
                     
                     # Add time if available
                     if game_time:
