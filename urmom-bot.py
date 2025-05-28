@@ -298,18 +298,14 @@ class PanthersManager:
                         games = data.get('games', [])
                         now_utc = datetime.datetime.now(pytz.utc)
                         
-                        logger.info(f"Found {len(games)} total games for Panthers")
-                        
                         # Get recent completed games
                         recent_games = []
                         for game in reversed(games):  # Start from most recent
                             try:
                                 game_date_str = game.get('gameDate', '')
                                 game_state = game.get('gameState', '')
-                                game_id = game.get('id', 'unknown')
                                 
                                 if not game_date_str:
-                                    logger.warning(f"Game {game_id} has no gameDate")
                                     continue
                                 
                                 # Parse the ISO date string - handle different formats
@@ -321,36 +317,26 @@ class PanthersManager:
                                         # Date only format - assume midnight UTC
                                         date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
                                         game_date = pytz.utc.localize(date_part)
-                                except ValueError as e:
-                                    logger.warning(f"Failed to parse date '{game_date_str}' for game {game_id}: {e}")
+                                except ValueError:
                                     continue
-                                
-                                logger.info(f"Game {game_id}: date={game_date}, state={game_state}, now={now_utc}")
                                 
                                 # Include completed games - expand the list of final states
                                 final_states = ['OFF', 'FINAL', 'OVER', 'FINAL_OT', 'FINAL_SO']
                                 if game_date < now_utc and game_state in final_states:
                                     recent_games.append(game)
-                                    logger.info(f"Added game {game_id} to recent games")
                                     if len(recent_games) >= limit:
                                         break
-                                elif game_date >= now_utc:
-                                    logger.info(f"Game {game_id} is in the future")
-                                elif game_state not in final_states:
-                                    logger.info(f"Game {game_id} state '{game_state}' not in final states")
                                     
                             except Exception as e:
                                 logger.warning(f"Error processing game {game.get('id', 'unknown')}: {e}")
                                 continue
                         
-                        logger.info(f"Found {len(recent_games)} recent completed games")
                         if recent_games:
                             return recent_games
                     else:
                         logger.warning(f"Failed to fetch games for team {self.config.PANTHERS_TEAM_ABBREV}: {response.status}")
                 
                 # Fallback: try with specific season format
-                logger.info("Trying fallback with 20242025 season")
                 url = f"{self.config.NHL_API_BASE}/club-schedule-season/{self.config.PANTHERS_TEAM_ABBREV}/20242025"
                 async with session.get(url) as response:
                     if response.status == 200:
@@ -363,7 +349,6 @@ class PanthersManager:
                             try:
                                 game_date_str = game.get('gameDate', '')
                                 game_state = game.get('gameState', '')
-                                game_id = game.get('id', 'unknown')
                                 
                                 if not game_date_str:
                                     continue
@@ -375,8 +360,7 @@ class PanthersManager:
                                     else:
                                         date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
                                         game_date = pytz.utc.localize(date_part)
-                                except ValueError as e:
-                                    logger.warning(f"Failed to parse date '{game_date_str}': {e}")
+                                except ValueError:
                                     continue
                                 
                                 final_states = ['OFF', 'FINAL', 'OVER', 'FINAL_OT', 'FINAL_SO', 'FINAL_OTHER']
@@ -385,18 +369,15 @@ class PanthersManager:
                                     if len(recent_games) >= limit:
                                         break
                             except Exception as e:
-                                logger.warning(f"Error parsing game date: {e}")
+                                logger.warning(f"Error parsing game: {e}")
                                 continue
                         
                         if recent_games:
                             return recent_games
-                        else:
-                            logger.info("No completed games found in 2024-2025 season schedule")
                     else:
                         logger.warning(f"Failed to fetch 2024-2025 season schedule: {response.status}")
                 
                 # Final fallback: try monthly schedule
-                logger.info("Trying monthly schedule fallback")
                 url = f"{self.config.NHL_API_BASE}/club-schedule/{self.config.PANTHERS_TEAM_ABBREV}/month/now"
                 async with session.get(url) as response:
                     if response.status == 200:
@@ -428,7 +409,7 @@ class PanthersManager:
                                     if len(recent_games) >= limit:
                                         break
                             except Exception as e:
-                                logger.warning(f"Error parsing game date: {e}")
+                                logger.warning(f"Error parsing game: {e}")
                                 continue
                         
                         return recent_games
