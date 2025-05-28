@@ -233,11 +233,11 @@ class PanthersManager:
             return None
         
     async def get_current_game(self):
-        """Get current Panthers game if one is active"""
+        """Get current Panthers game if one is active or scheduled for today"""
         try:
             async with aiohttp.ClientSession() as session:
                 # Get today's schedule
-                today = datetime.datetime.now().strftime('%Y-%m-%d')
+                today = datetime.datetime.now(pytz.timezone('US/Eastern')).strftime('%Y-%m-%d')
                 url = f"{self.config.NHL_API_BASE}/schedule/{today}"
                 async with session.get(url) as response:
                     if response.status == 200:
@@ -250,9 +250,35 @@ class PanthersManager:
                                 if (home_team.get('id') == self.config.PANTHERS_TEAM_ID or 
                                     away_team.get('id') == self.config.PANTHERS_TEAM_ID):
                                     return game
+                
+                # Fallback: check team schedule for today's game
+                url = f"{self.config.NHL_API_BASE}/club-schedule/{self.config.PANTHERS_TEAM_ABBREV}/week/now"
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        games = data.get('games', [])
+                        today_utc = datetime.datetime.now(pytz.utc).date()
+                        
+                        for game in games:
+                            game_date_str = game.get('gameDate', '')
+                            if game_date_str:
+                                try:
+                                    if 'T' in game_date_str:
+                                        game_date = datetime.datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
+                                    else:
+                                        date_part = datetime.datetime.strptime(game_date_str, '%Y-%m-%d')
+                                        game_date = pytz.utc.localize(date_part)
+                                    
+                                    # Check if game is today
+                                    if game_date.date() == today_utc:
+                                        return game
+                                except ValueError:
+                                    continue
+                        
         except Exception as e:
             logger.error(f"Error fetching current Panthers game: {e}")
-            return None
+            
+        return None
             
     async def get_next_game(self):
         """Get next Panthers game"""
