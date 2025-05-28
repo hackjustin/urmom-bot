@@ -1,6 +1,6 @@
 # Urmom Discord Bot
 
-A feature-rich Discord bot that responds to specific phrases with GIFs and reactions, provides movie information, offers a reminder system, and delivers real-time Florida Panthers NHL updates.
+A feature-rich Discord bot that responds to specific phrases with GIFs and reactions, provides movie information, offers a reminder system, and delivers **real-time Florida Panthers NHL updates with live score monitoring**.
 
 ## Features
 
@@ -13,10 +13,12 @@ A feature-rich Discord bot that responds to specific phrases with GIFs and react
 
 ### 🐾 Florida Panthers Features
 - **Team Overview**: Current standings, record, and next/live game info
-- **Live Game Updates**: Real-time scores, period information, and game status
+- **🚨 Live Game Monitoring**: Real-time goal notifications, period changes, and game updates
+- **Live Score Updates**: Automatic score change announcements during games
 - **Game Details**: Comprehensive current and upcoming game information
 - **Recent Games**: Last 5 Panthers games with results
 - **Player Quotes**: Random inspirational quotes from Panthers players and coaches
+- **Channel-Based Controls**: Each Discord channel can independently enable/disable live updates
 
 ## Setup
 
@@ -115,14 +117,60 @@ Shows the last 5 Panthers games with:
 - Win/Loss result
 - Opponent and home/away status
 
+#### `!cats live [on/off/status]` 🚨 **NEW!**
+Controls live game updates for the current channel:
+- **`!cats live on`** - Enable real-time score updates, goal notifications, and period changes
+- **`!cats live off`** - Disable live updates for this channel
+- **`!cats live status`** - Check if live updates are enabled and monitoring status
+
+**Live Update Features:**
+- 🚨 **Goal Notifications**: Instant alerts when goals are scored (extra excitement for Panthers goals!)
+- 🏒 **Period Changes**: Notifications when periods start
+- 🎉 **Game Results**: Final score announcements when games end
+- ⚡ **Smart Timing**: Only monitors during game hours, checks every 30 seconds during live games
+
 #### `!cats help`
 Lists all available Panthers commands with descriptions.
+
+## 🚨 Live Game Monitoring
+
+The bot includes an advanced live game monitoring system that:
+
+### **Automatic Detection**
+- Monitors NHL API every 30 seconds during prime game hours (6 PM - 11 PM ET)
+- Automatically detects when Panthers games go live
+- Tracks score changes, period transitions, and game endings
+
+### **Smart Notifications**
+- **Panthers Goals**: `🚨 PANTHERS GOAL! 🚨` with enhanced formatting
+- **Opponent Goals**: Standard goal notification
+- **Period Changes**: `🏒 Period 2 Starting`
+- **Game Endings**: `🎉 PANTHERS WIN!` or `😞 Game Over`
+
+### **Channel Management**
+- Each Discord channel controls its own live update preferences
+- Multiple channels can have different settings
+- Automatic cleanup of invalid channels
+
+### **Example Live Updates**
+```
+🚨 PANTHERS GOAL! 🚨
+FLA 2 - 1 CAR
+Period 2 - 15:23
+
+🏒 Period 3 Starting
+FLA 2 - 1 CAR
+
+🎉 PANTHERS WIN! 🎉
+Final: FLA 3 - 1 CAR
+```
 
 ## API Integration
 
 ### NHL API
 The bot uses the official NHL API to provide:
 - Real-time game scores and statistics
+- Live game state monitoring
 - Team standings and records
 - Schedule information
 - Player and team data
@@ -176,6 +224,20 @@ PANTHERS_QUOTES = [
 #### Adding New Panthers Commands
 Follow the pattern established in the `cats_command` function to add new subcommands.
 
+#### Customizing Live Updates
+Modify the live monitoring behavior in the `live_game_monitor()` and related methods:
+- Adjust monitoring frequency
+- Add new types of notifications
+- Customize message formatting
+- Add team-specific celebrations
+
+## Background Tasks
+
+The bot runs several background tasks:
+- **Reminder System**: Checks for due reminders every 10 seconds
+- **Live Game Monitor**: Monitors Panthers games every 30 seconds during game hours
+- **Smart Scheduling**: Reduces API calls during off-hours to improve performance
+
 ## Error Handling
 
 The bot includes comprehensive error handling for:
@@ -183,12 +245,21 @@ The bot includes comprehensive error handling for:
 - Network timeouts
 - Invalid user input
 - Missing configuration
+- Live monitoring interruptions
+- Channel management issues
 
 Errors are logged for debugging while providing user-friendly messages in Discord.
 
 ## Time Zone Support
 
-All Panthers game times are automatically converted to Eastern Time (US/Eastern) for accurate Florida-based scheduling.
+All Panthers game times are automatically converted to Eastern Time (US/Eastern) for accurate Florida-based scheduling. Live monitoring respects EST/EDT transitions.
+
+## Performance Optimization
+
+- **Smart API Usage**: Reduces polling frequency during non-game hours
+- **Efficient Channel Management**: Automatically removes invalid channels
+- **Memory Management**: Cleans up game state data after games end
+- **Error Recovery**: Continues monitoring even if individual API calls fail
 
 ## Contributing
 
@@ -196,8 +267,21 @@ When adding new features:
 1. Follow the existing code structure and patterns
 2. Add appropriate error handling
 3. Update this README with new commands/features
-4. Test thoroughly before deployment
+4. Test thoroughly, especially live monitoring features
+5. Consider performance impact of background tasks
 
 ## License
 
 This project is for personal/educational use.
+
+---
+
+## 🏒 Perfect for Panthers Fans!
+
+This bot is specifically designed for Florida Panthers fans who want:
+- **Real-time playoff updates** during Conference Finals and Stanley Cup runs
+- **Comprehensive team information** at their fingertips
+- **Customizable notifications** that don't spam unwilling channels
+- **Smart, hockey-aware features** that understand the game
+
+**Ready for Game 5!** 🐾🚨

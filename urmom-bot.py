@@ -458,15 +458,21 @@ class UrmomBot(commands.Bot):
         self.panthers_manager = PanthersManager(self)
         self.movie_selections = {}
         
+        # Live score monitoring
+        self.live_channels = set()  # Channels that want live updates
+        self.last_game_state = {}  # Store last known game state
+        self.live_monitor_task = None
+        
         # Register commands and events
         self.add_commands()
         
-        # Start reminder check loop
+        # Start background tasks
         self.reminder_check_task = None
     
     async def setup_hook(self):
         """Set up background tasks when the bot is ready"""
         self.reminder_check_task = self.loop.create_task(self.reminder_check_loop())
+        self.live_monitor_task = self.loop.create_task(self.live_game_monitor())
     
     async def reminder_check_loop(self):
         """Background task to check for due reminders"""
@@ -475,6 +481,140 @@ class UrmomBot(commands.Bot):
             await self.reminder_manager.check_reminders()
             await asyncio.sleep(self.config.REMINDER_CHECK_INTERVAL)
     
+    async def live_game_monitor(self):
+        """Background task to monitor live Panthers games"""
+        await self.wait_until_ready()
+        logger.info("🏒 Live game monitor started!")
+        
+        while not self.is_closed():
+            try:
+                # Only check if we have channels subscribed to live updates
+                if self.live_channels:
+                    current_game = await self.panthers_manager.get_current_game()
+                    
+                    if current_game:
+                        game_state = current_game.get('gameState', '')
+                        game_id = current_game.get('id', '')
+                        
+                        # Check if game is live
+                        if game_state in ['LIVE', 'CRIT']:
+                            await self.check_for_score_changes(current_game)
+                        elif game_state == 'OFF' and game_id in self.last_game_state:
+                            # Game just ended
+                            await self.announce_game_end(current_game)
+                            # Clear the stored state
+                            if game_id in self.last_game_state:
+                                del self.last_game_state[game_id]
+                
+                # Check every 30 seconds during potential game times, less frequently otherwise
+                current_hour = datetime.datetime.now().hour
+                if 18 <= current_hour <= 23:  # Prime game hours (6 PM - 11 PM ET)
+                    await asyncio.sleep(30)
+                else:
+                    await asyncio.sleep(300)  # 5 minutes during off-hours
+                    
+            except Exception as e:
+                logger.error(f"Error in live game monitor: {e}")
+                await asyncio.sleep(60)  # Wait longer if there's an error
+    
+    async def check_for_score_changes(self, current_game):
+        """Check if the score has changed and announce updates"""
+        game_id = current_game.get('id', '')
+        home_team = current_game.get('homeTeam', {})
+        away_team = current_game.get('awayTeam', {})
+        
+        # Current game state
+        current_state = {
+            'home_score': home_team.get('score', 0),
+            'away_score': away_team.get('score', 0),
+            'period': current_game.get('periodDescriptor', {}).get('number', ''),
+            'time_remaining': current_game.get('clock', {}).get('timeRemaining', ''),
+            'home_abbrev': home_team.get('abbrev', 'HOME'),
+            'away_abbrev': away_team.get('abbrev', 'AWAY')
+        }
+        
+        # Check if we have previous state
+        if game_id in self.last_game_state:
+            last_state = self.last_game_state[game_id]
+            
+            # Score change detected!
+            if (current_state['home_score'] != last_state['home_score'] or 
+                current_state['away_score'] != last_state['away_score']):
+                await self.announce_score_change(current_state, last_state)
+            
+            # Period change detected!
+            elif current_state['period'] != last_state['period']:
+                await self.announce_period_change(current_state)
+        
+        # Update stored state
+        self.last_game_state[game_id] = current_state
+    
+    async def announce_score_change(self, current_state, last_state):
+        """Announce a score change to subscribed channels"""
+        # Figure out who scored
+        panthers_scored = False
+        if current_state['home_abbrev'] == 'FLA':
+            panthers_scored = current_state['home_score'] > last_state['home_score']
+        else:
+            panthers_scored = current_state['away_score'] > last_state['away_score']
+        
+        # Create announcement
+        if panthers_scored:
+            announcement = f"🚨 **PANTHERS GOAL!** 🚨\n"
+        else:
+            announcement = f"⚪ Goal scored\n"
+        
+        announcement += f"{current_state['away_abbrev']} {current_state['away_score']} - {current_state['home_score']} {current_state['home_abbrev']}\n"
+        announcement += f"Period {current_state['period']} - {current_state['time_remaining']}"
+        
+        await self.send_to_live_channels(announcement)
+    
+    async def announce_period_change(self, current_state):
+        """Announce period changes"""
+        announcement = f"🏒 **Period {current_state['period']} Starting**\n"
+        announcement += f"{current_state['away_abbrev']} {current_state['away_score']} - {current_state['home_score']} {current_state['home_abbrev']}"
+        
+        await self.send_to_live_channels(announcement)
+    
+    async def announce_game_end(self, game):
+        """Announce when the game ends"""
+        home_team = game.get('homeTeam', {})
+        away_team = game.get('awayTeam', {})
+        
+        home_score = home_team.get('score', 0)
+        away_score = away_team.get('score', 0)
+        
+        # Check if Panthers won
+        panthers_won = False
+        if home_team.get('abbrev') == 'FLA':
+            panthers_won = home_score > away_score
+        else:
+            panthers_won = away_score > home_score
+        
+        if panthers_won:
+            announcement = f"🎉 **PANTHERS WIN!** 🎉\n"
+        else:
+            announcement = f"😞 **Game Over**\n"
+        
+        announcement += f"Final: {away_team.get('abbrev', 'AWAY')} {away_score} - {home_score} {home_team.get('abbrev', 'HOME')}"
+        
+        await self.send_to_live_channels(announcement)
+    
+    async def send_to_live_channels(self, message):
+        """Send a message to all channels subscribed to live updates"""
+        for channel_id in self.live_channels.copy():  # Copy to avoid modification during iteration
+            try:
+                channel = self.get_channel(channel_id)
+                if channel:
+                    await channel.send(message)
+                else:
+                    # Channel not found, remove from live channels
+                    self.live_channels.discard(channel_id)
+            except Exception as e:
+                logger.error(f"Failed to send live update to channel {channel_id}: {e}")
+                # Remove problematic channels
+                self.live_channels.discard(channel_id)
+    
     def add_commands(self):
         @self.command(name='mom')
         async def mom_command(ctx):
@@ -482,7 +622,7 @@ class UrmomBot(commands.Bot):
             await ctx.send('what...?')
             
         @self.command(name='cats')
-        async def cats_command(ctx, subcommand=None):
+        async def cats_command(ctx, subcommand=None, action=None):
             """Panthers team information"""
             if subcommand is None:
                 await self.handle_cats_main(ctx)
@@ -492,6 +632,8 @@ class UrmomBot(commands.Bot):
                 await self.handle_cats_game(ctx)
             elif subcommand.lower() == 'recent':
                 await self.handle_cats_recent(ctx)
+            elif subcommand.lower() == 'live':
+                await self.handle_cats_live(ctx, action)
             elif subcommand.lower() == 'help':
                 await self.handle_cats_help(ctx)
             else:
@@ -677,7 +819,7 @@ class UrmomBot(commands.Bot):
             
             embed.add_field(
                 name="Commands", 
-                value="`!cats quote` - Random player quote\n`!cats game` - Detailed game info\n`!cats recent` - Recent games\n`!cats help` - All commands", 
+                value="`!cats quote` - Random player quote\n`!cats game` - Detailed game info\n`!cats recent` - Recent games\n`!cats live on/off/status` - 🚨 Live updates\n`!cats help` - All commands", 
                 inline=False
             )
             embed.set_footer(text="Go Panthers! 🐾")
@@ -871,6 +1013,71 @@ class UrmomBot(commands.Bot):
             
             await ctx.send(embed=embed)
         
+        async def handle_cats_live(self, ctx, action):
+            """Handle live game updates toggle"""
+            if not action:
+                await ctx.send("Usage: `!cats live on/off/status`\n"
+                              "- `!cats live on` - Enable live score updates in this channel\n"
+                              "- `!cats live off` - Disable live score updates\n"
+                              "- `!cats live status` - Check current status")
+                return
+            
+            channel_id = ctx.channel.id
+            
+            if action.lower() == 'on':
+                self.live_channels.add(channel_id)
+                embed = discord.Embed(
+                    title="🚨 Live Updates Enabled!",
+                    description="This channel will now receive live Panthers game updates including:\n"
+                               "• Goal notifications 🚨\n"
+                               "• Period changes 🏒\n"
+                               "• Game end results 🎉\n\n"
+                               "Use `!cats live off` to disable.",
+                    color=0xC8102E
+                )
+                await ctx.send(embed=embed)
+                logger.info(f"Live updates enabled for channel {channel_id}")
+                
+            elif action.lower() == 'off':
+                self.live_channels.discard(channel_id)
+                embed = discord.Embed(
+                    title="🔇 Live Updates Disabled",
+                    description="This channel will no longer receive live Panthers game updates.\n"
+                               "Use `!cats live on` to re-enable.",
+                    color=0x808080
+                )
+                await ctx.send(embed=embed)
+                logger.info(f"Live updates disabled for channel {channel_id}")
+                
+            elif action.lower() == 'status':
+                is_enabled = channel_id in self.live_channels
+                status = "🟢 **ENABLED**" if is_enabled else "🔴 **DISABLED**"
+                
+                embed = discord.Embed(
+                    title="📊 Live Updates Status",
+                    description=f"Live Panthers updates: {status}\n\n"
+                               f"Total channels with live updates: {len(self.live_channels)}",
+                    color=0xC8102E if is_enabled else 0x808080
+                )
+                
+                # Show when next game monitoring will be active
+                current_game = await self.panthers_manager.get_current_game()
+                if current_game:
+                    game_state = current_game.get('gameState', '')
+                    if game_state in ['LIVE', 'CRIT']:
+                        embed.add_field(name="🔴 Current Status", value="Game is LIVE - monitoring active!", inline=False)
+                    else:
+                        embed.add_field(name="🏒 Current Status", value="Game today but not started - ready to monitor!", inline=False)
+                else:
+                    next_game = await self.panthers_manager.get_next_game()
+                    if next_game:
+                        embed.add_field(name="⏰ Next Monitoring", value="Will activate when next Panthers game goes live", inline=False)
+                
+                await ctx.send(embed=embed)
+                
+            else:
+                await ctx.send("Invalid option. Use `on`, `off`, or `status`.")
+        
         async def handle_cats_help(self, ctx):
             """Panthers commands help"""
             embed = discord.Embed(
@@ -884,6 +1091,27 @@ class UrmomBot(commands.Bot):
                 ("`!cats quote`", "Random player or coach quote"),
                 ("`!cats game`", "Detailed current or next game information"),
                 ("`!cats recent`", "Last 5 Panthers games with results"),
+                ("`!cats live on/off/status`", "🚨 Toggle live game updates"),
+                ("`!cats help`", "This help message")
+            ]
+            
+            for cmd, desc in commands_info:
+                embed.add_field(name=cmd, value=desc, inline=False)
+            
+        async def handle_cats_help(self, ctx):
+            """Panthers commands help"""
+            embed = discord.Embed(
+                title="🐾 Panthers Commands",
+                color=0xC8102E,
+                description="All available Panthers commands"
+            )
+            
+            commands_info = [
+                ("`!cats`", "Team overview, standings, and next/current game"),
+                ("`!cats quote`", "Random player or coach quote"),
+                ("`!cats game`", "Detailed current or next game information"),
+                ("`!cats recent`", "Last 5 Panthers games with results"),
+                ("`!cats live on/off/status`", "🚨 Toggle live game updates"),
                 ("`!cats help`", "This help message")
             ]
             
@@ -898,6 +1126,7 @@ class UrmomBot(commands.Bot):
         self.handle_cats_quote = handle_cats_quote.__get__(self, UrmomBot)
         self.handle_cats_game = handle_cats_game.__get__(self, UrmomBot)
         self.handle_cats_recent = handle_cats_recent.__get__(self, UrmomBot)
+        self.handle_cats_live = handle_cats_live.__get__(self, UrmomBot)
         self.handle_cats_help = handle_cats_help.__get__(self, UrmomBot)
         
         @self.command(name='movie')
@@ -1174,9 +1403,11 @@ def main():
     except Exception as e:
         logger.error(f"Error running bot: {e}")
         
-    # Clean up reminder task if it exists
+    # Clean up tasks if they exist
     if bot.reminder_check_task:
         bot.reminder_check_task.cancel()
+    if bot.live_monitor_task:
+        bot.live_monitor_task.cancel()
 
 if __name__ == "__main__":
     main()
