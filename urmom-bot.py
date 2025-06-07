@@ -528,7 +528,6 @@ class UrmomBot(commands.Bot):
             'home_score': home_team.get('score', 0),
             'away_score': away_team.get('score', 0),
             'period': current_game.get('periodDescriptor', {}).get('number', ''),
-            'time_remaining': current_game.get('clock', {}).get('timeRemaining', ''),
             'home_abbrev': home_team.get('abbrev', 'HOME'),
             'away_abbrev': away_team.get('abbrev', 'AWAY')
         }
@@ -565,7 +564,7 @@ class UrmomBot(commands.Bot):
             announcement = f"⚪ Goal scored\n"
         
         announcement += f"{current_state['away_abbrev']} {current_state['away_score']} - {current_state['home_score']} {current_state['home_abbrev']}\n"
-        announcement += f"Period {current_state['period']} - {current_state['time_remaining']}"
+        announcement += f"Period {current_state['period']}"
         
         await self.send_to_live_channels(announcement)
     
@@ -678,9 +677,9 @@ class UrmomBot(commands.Bot):
                 game_state = current_game.get('gameState', '')
                 venue = current_game.get('venue', {}).get('default', '')
                 
-                # Determine if it's a playoff game based on game ID
-                game_id = current_game.get('id', '')
-                is_playoff = game_id and '03' in str(game_id)  # Playoff games have '03' in the ID
+                # Get series title from API
+                series_status = current_game.get('seriesStatus', {})
+                series_title = series_status.get('seriesTitle', '')
                 
                 if game_state in ['LIVE', 'CRIT']:
                     home_score = home_team.get('score', 0)
@@ -689,8 +688,8 @@ class UrmomBot(commands.Bot):
                     time_remaining = current_game.get('clock', {}).get('timeRemaining', '')
                     
                     game_info = f"🔴 **LIVE GAME**"
-                    if is_playoff:
-                        game_info += f" - Conference Finals"
+                    if series_title:
+                        game_info += f" - {series_title}"
                     game_info += f"\n{away_team.get('abbrev', 'AWAY')} {away_score} - {home_score} {home_team.get('abbrev', 'HOME')}\n"
                     game_info += f"Period {period} - {time_remaining}"
                     if venue:
@@ -746,8 +745,8 @@ class UrmomBot(commands.Bot):
                     
                     # Second line: playoff context + opponent info
                     second_line = ""
-                    if is_playoff:
-                        second_line += "Conference Finals "
+                    if series_title:
+                        second_line += f"{series_title} "
                     second_line += f"vs {opponent} ({location})"
                     game_info += second_line
                     
@@ -798,17 +797,17 @@ class UrmomBot(commands.Bot):
                     location = "HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "AWAY"
                     venue = next_game.get('venue', {}).get('default', '')
                     
-                    # Check if it's a playoff game
-                    game_id = next_game.get('id', '')
-                    is_playoff = game_id and '03' in str(game_id)
+                    # Get series title
+                    series_status = next_game.get('seriesStatus', {})
+                    series_title = series_status.get('seriesTitle', '')
                     
                     # Always use "NEXT GAME"
                     game_info = f"🏒 **NEXT GAME** - {formatted_date_time}\n"
                     
                     # Second line: playoff context + opponent info
                     second_line = ""
-                    if is_playoff:
-                        second_line += "Conference Finals "
+                    if series_title:
+                        second_line += f"{series_title} "
                     second_line += f"vs {opponent} ({location})"
                     game_info += second_line
                     
@@ -879,9 +878,17 @@ class UrmomBot(commands.Bot):
                     location = "🏠 HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "✈️ AWAY"
                     venue = next_game.get('venue', {}).get('default', '')
                     
+                    # Get series info
+                    series_status = next_game.get('seriesStatus', {})
+                    series_title = series_status.get('seriesTitle', '')
+                    
                     embed.add_field(name="Date", value=formatted_date_short, inline=True)
                     embed.add_field(name="Opponent", value=f"vs {opponent}", inline=True)
                     embed.add_field(name="Location", value=location, inline=True)
+                    
+                    if series_title:
+                        embed.add_field(name="Series", value=series_title, inline=False)
+                    
                     embed.add_field(name="Game Time", value=formatted_date, inline=False)
                     if venue:
                         embed.add_field(name="Venue", value=f"📍 {venue}", inline=False)
@@ -904,6 +911,10 @@ class UrmomBot(commands.Bot):
             # Basic game info
             opponent = away_team.get('abbrev', '') if home_team.get('id') == self.config.PANTHERS_TEAM_ID else home_team.get('abbrev', '')
             location = "🏠 HOME" if home_team.get('id') == self.config.PANTHERS_TEAM_ID else "✈️ AWAY"
+            
+            # Get series info
+            series_status = current_game.get('seriesStatus', {})
+            series_title = series_status.get('seriesTitle', '')
             
             # Add game date with smart logic
             game_date_str = current_game.get('gameDate', '')
@@ -936,16 +947,17 @@ class UrmomBot(commands.Bot):
             embed.add_field(name="Opponent", value=f"vs {opponent}", inline=True)
             embed.add_field(name="Location", value=location, inline=True)
             
+            if series_title:
+                embed.add_field(name="Series", value=series_title, inline=False)
+            
             if game_state in ['LIVE', 'CRIT']:
                 home_score = home_team.get('score', 0)
                 away_score = away_team.get('score', 0)
                 period = current_game.get('periodDescriptor', {}).get('number', '')
-                time_remaining = current_game.get('clock', {}).get('timeRemaining', '')
                 
                 score_display = f"{away_team.get('abbrev', 'AWAY')} {away_score} - {home_score} {home_team.get('abbrev', 'HOME')}"
                 embed.add_field(name="🔴 LIVE SCORE", value=score_display, inline=False)
                 embed.add_field(name="Period", value=period, inline=True)
-                embed.add_field(name="Time Remaining", value=time_remaining, inline=True)
                 
                 # Add shots if available
                 home_shots = home_team.get('sog', 0)
@@ -1078,26 +1090,6 @@ class UrmomBot(commands.Bot):
             else:
                 await ctx.send("Invalid option. Use `on`, `off`, or `status`.")
         
-        async def handle_cats_help(self, ctx):
-            """Panthers commands help"""
-            embed = discord.Embed(
-                title="🐾 Panthers Commands",
-                color=0xC8102E,
-                description="All available Panthers commands"
-            )
-            
-            commands_info = [
-                ("`!cats`", "Team overview, standings, and next/current game"),
-                ("`!cats quote`", "Random player or coach quote"),
-                ("`!cats game`", "Detailed current or next game information"),
-                ("`!cats recent`", "Last 5 Panthers games with results"),
-                ("`!cats live on/off/status`", "🚨 Toggle live game updates"),
-                ("`!cats help`", "This help message")
-            ]
-            
-            for cmd, desc in commands_info:
-                embed.add_field(name=cmd, value=desc, inline=False)
-            
         async def handle_cats_help(self, ctx):
             """Panthers commands help"""
             embed = discord.Embed(
