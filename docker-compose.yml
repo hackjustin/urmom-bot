@@ -1,11 +1,18 @@
-version: '3'
+version: '3.8'
 
 services:
   urmom-bot:
     build: .
     container_name: urmom-bot
+    restart: unless-stopped
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - OMDB_API_KEY=${OMDB_API_KEY}
     env_file:
       - .env
     volumes:
-      - ./gifs:/app/gifs
-    restart: unless-stopped
+      # Optional: Mount gifs directory if you want to update them without rebuilding
+      - ./gifs:/app/gifs:ro
+    # Remove port mapping unless you add a health endpoint
+    # ports:
+    #   - "8080:8080"
