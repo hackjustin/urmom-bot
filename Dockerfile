@@ -1,20 +1,21 @@
 FROM python:3.11-slim
+
 WORKDIR /app
 
-# Install dependencies
+# Copy requirements first for better caching
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Modified pip install command to handle discord.py without voice support
-RUN pip install --no-cache-dir --upgrade pip && \
-    # First install everything except discord.py
-    grep -v "discord.py" requirements.txt | pip install --no-cache-dir -r /dev/stdin && \
-    # Then install discord.py without dependencies
-    pip install --no-cache-dir --no-deps discord.py && \
-    # Install essential discord.py dependencies (excluding voice)
-    pip install --no-cache-dir aiohttp typing-extensions
-
-# Copy application code
+# Copy the entire bot structure
 COPY . .
 
-# Run the bot
-CMD ["python", "urmom-bot.py"]
+# Create the bot module directory if it doesn't exist
+RUN mkdir -p bot
+
+# Make sure the gifs directory exists
+RUN mkdir -p gifs
+
+# Set Python path to include the current directory
+ENV PYTHONPATH=/app
+
+CMD ["python", "main.py"]
