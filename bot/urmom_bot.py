@@ -233,3 +233,15 @@ class UrmomBot(commands.Bot):
             # Currently commented out as in original code
             # await message.channel.send(file=discord.File(self.config.ALOT_GIF))
             pass
+    
+    async def close(self):
+        """Clean up resources when shutting down"""
+        # Clean up movie manager resources
+        await self.movie_manager.cleanup()
+        
+        # Cancel background tasks
+        if hasattr(self, 'reminder_check_task') and self.reminder_check_task:
+            self.reminder_check_task.cancel()
+        
+        # Call parent close
+        await super().close()
