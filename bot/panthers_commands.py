@@ -9,11 +9,12 @@ logger = logging.getLogger('urmom-bot')
 class PanthersCommands:
     """Handles all Panthers-related commands"""
     
-    def __init__(self, config, panthers_manager, live_monitor, team_comparison):
+    def __init__(self, config, panthers_manager, live_monitor, team_comparison, bracket_manager):
         self.config = config
         self.panthers_manager = panthers_manager
         self.live_monitor = live_monitor
         self.team_comparison = team_comparison
+        self.bracket_manager = bracket_manager  # Add bracket manager
     
     async def handle_cats_main(self, ctx):
         """Main cats command - team overview"""
@@ -52,13 +53,64 @@ class PanthersCommands:
         
         embed.add_field(
             name="Commands", 
-            value="`!cats quote` - Random player quote\n`!cats game` - Detailed game info\n`!cats recent` - Recent games\n`!cats vs <team>` - Team comparison\n`!cats player <n>` - Player stats\n`!cats live on/off/status` - 🚨 Live updates\n`!cats help` - All commands", 
+            value="`!cats quote` - Random player quote\n`!cats game` - Detailed game info\n`!cats recent` - Recent games\n`!cats vs <team>` - Team comparison\n`!cats player <n>` - Player stats\n`!cats live on/off/status` - 🚨 Live updates\n`!cats bracket` - 🏆 Playoff bracket\n`!cats series` - 🐾 Panthers series\n`!cats help` - All commands", 
             inline=False
         )
         embed.set_footer(text="Go Panthers! 🐾")
         
         await ctx.send(embed=embed)
     
+    # NEW PLAYOFF BRACKET COMMANDS
+    async def handle_cats_bracket(self, ctx):
+        """Display the current Stanley Cup playoff bracket"""
+        await self.bracket_manager.show_bracket(ctx)
+    
+    async def handle_cats_series(self, ctx):
+        """Show current Panthers playoff series status"""
+        await self.bracket_manager.show_panthers_series(ctx)
+    
+    async def handle_cats_round(self, ctx, round_num=None):
+        """Show playoff round summary
+        
+        Usage:
+        !cats round - Show all rounds
+        !cats round 1 - Show first round only
+        !cats round 4 - Show Stanley Cup Final
+        """
+        try:
+            round_number = int(round_num) if round_num else None
+            await self.bracket_manager.show_round_summary(ctx, round_number)
+        except ValueError:
+            await ctx.send("❌ Please provide a valid round number (1-4) or leave blank for all rounds.")
+    
+    async def handle_cats_playoffs_help(self, ctx):
+        """Show available playoff bracket commands"""
+        embed = discord.Embed(
+            title="🏆 Playoff Bracket Commands",
+            color=0xFFD700,
+            description="Track the Stanley Cup Playoffs!"
+        )
+        
+        commands = [
+            ("!cats bracket", "Show full playoff bracket"),
+            ("!cats series", "Show Panthers current series"),
+            ("!cats round", "Show all playoff rounds"),
+            ("!cats round 1", "Show specific round (1-4)"),
+        ]
+        
+        for cmd, desc in commands:
+            embed.add_field(name=cmd, value=desc, inline=False)
+        
+        embed.add_field(
+            name="📊 Features",
+            value="• Live series scores\n• Next game info\n• Panthers status tracking\n• Updates every 5 minutes",
+            inline=False
+        )
+        
+        embed.set_footer(text="Go Panthers! 🐾")
+        await ctx.send(embed=embed)
+    
+    # EXISTING METHODS (unchanged)
     async def _add_game_info_to_embed(self, embed, current_game):
         """Add current/next game info to embed"""
         if current_game:
@@ -432,6 +484,9 @@ class PanthersCommands:
             ("`!cats vs <team>`", "Team comparison with detailed stats"),
             ("`!cats player <name>`", "NHL player stats lookup"),
             ("`!cats live on/off/status`", "🚨 Toggle live game updates"),
+            ("`!cats bracket`", "🏆 Show Stanley Cup playoff bracket"),
+            ("`!cats series`", "🐾 Show Panthers playoff series status"),
+            ("`!cats round [number]`", "📊 Show playoff round summary"),
             ("`!cats help`", "This help message")
         ]
         

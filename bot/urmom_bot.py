@@ -11,6 +11,7 @@ from bot.movie_manager import MovieManager
 from bot.live_monitor import LiveGameMonitor
 from bot.panthers_commands import PanthersCommands
 from bot.player_stats import PlayerStatsManager
+from bot.playoff_bracket import PlayoffBracketManager  # Add this import
 
 logger = logging.getLogger('urmom-bot')
 
@@ -27,9 +28,14 @@ class UrmomBot(commands.Bot):
         self.team_comparison = TeamComparison(self.config)
         self.movie_manager = MovieManager(self.config)
         self.player_stats_manager = PlayerStatsManager(self.config)
+        self.bracket_manager = PlayoffBracketManager(self.config)  # Add this line
         self.live_monitor = LiveGameMonitor(self, self.panthers_manager, self.config)
         self.panthers_commands = PanthersCommands(
-            self.config, self.panthers_manager, self.live_monitor, self.team_comparison
+            self.config, 
+            self.panthers_manager, 
+            self.live_monitor, 
+            self.team_comparison,
+            self.bracket_manager  # Add this parameter
         )
         
         # Background tasks
@@ -76,10 +82,17 @@ class UrmomBot(commands.Bot):
             elif subcommand.lower() == 'live':
                 action = args.strip() if args else None
                 await self.panthers_commands.handle_cats_live(ctx, action)
+            elif subcommand.lower() == 'bracket':  # Add bracket command
+                await self.panthers_commands.handle_cats_bracket(ctx)
+            elif subcommand.lower() == 'series':  # Add series command
+                await self.panthers_commands.handle_cats_series(ctx)
+            elif subcommand.lower() == 'round':  # Add round command
+                round_num = args.strip() if args else None
+                await self.panthers_commands.handle_cats_round(ctx, round_num)
             elif subcommand.lower() == 'help':
                 await self.panthers_commands.handle_cats_help(ctx)
             else:
-                await ctx.send("Unknown command. Use `!cats`, `!cats game`, `!cats live`, `!cats vs <team>`, `!cats player <name>`, or `!cats help`")
+                await ctx.send("Unknown command. Use `!cats`, `!cats game`, `!cats live`, `!cats vs <team>`, `!cats player <name>`, `!cats bracket`, `!cats series`, or `!cats help`")
         
         @self.command(name='movie')
         async def movie_command(ctx, *, query=None):
@@ -189,52 +202,6 @@ class UrmomBot(commands.Bot):
             
             # Check for player selection
             if await self.player_stats_manager.handle_player_selection(message):
-                return
-            
-            # Process commands first
-            await self.process_commands(message)
-            
-            # Check for 'ur mom' or 'your mom' in message
-            if 'ur mom' in message.content.lower() or 'your mom' in message.content.lower():
-                await self.handle_mom_reference(message)
-            
-            # Check for 'alot' in message
-            if 'alot' in message.content.lower() and not any(exception in message.content.lower() for exception in self.config.ALOT_EXCEPTIONS):
-                await self.handle_alot_reference(message)
-    
-    async def handle_mom_reference(self, message):
-        """Handle when someone mentions 'ur mom' or 'your mom'"""
-        await message.channel.send(file=discord.File(self.config.URMOM_GIF))
-    
-    async def handle_alot_reference(self, message):
-        """Handle when someone uses 'alot' instead of 'a lot'"""
-        if self.config.USE_REACTIONS:
-            # Add letter reactions to spell "ALOT"
-            await message.add_reaction('🇦')
-            await message.add_reaction('🇱')
-            await message.add_reaction('🇴')
-            await message.add_reaction('🇹')
-        
-        # Optionally send the alot GIF if enabled
-        if self.config.USE_GIF_RESPONSES:
-            # Currently commented out as in original code
-            # await message.channel.send(file=discord.File(self.config.ALOT_GIF))
-            await ctx.send(f"I'll remind you at {est_time}!")
-                
-        @self.event
-        async def on_ready():
-            """Event fired when the bot is ready"""
-            logger.info(f'Logged in as {self.user.name} - {self.user.id}')
-            logger.info(f'Bot is ready to serve in {len(self.guilds)} guilds')
-        
-        @self.event
-        async def on_message(message):
-            """Event fired when a message is received"""
-            if message.author == self.user:
-                return
-            
-            # Check for movie selection
-            if await self.movie_manager.handle_movie_selection(message):
                 return
             
             # Process commands first

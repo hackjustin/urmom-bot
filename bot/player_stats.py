@@ -194,8 +194,23 @@ class PlayerStatsManager:
     async def _create_player_stats_embed(self, stats_data, player_info):
         """Create embed with player statistics - handles both skaters and goalies"""
         name = stats_data.get('skaterFullName', 'Unknown Player')
-        team_abbrevs = stats_data.get('teamAbbrevs', [])
-        current_team = team_abbrevs[0] if team_abbrevs else 'N/A'
+        
+        # Handle team abbreviations - teamAbbrevs is a STRING, not an array!
+        team_abbrevs = stats_data.get('teamAbbrevs', '')
+        team_abbrev_single = stats_data.get('teamAbbrev', '')
+        
+        # teamAbbrevs is actually a string in the API response, not an array
+        if team_abbrevs:
+            current_team = str(team_abbrevs)
+        elif team_abbrev_single:
+            current_team = str(team_abbrev_single)
+        else:
+            # Try alternative field names that might exist
+            current_team = (stats_data.get('team', '') or 
+                          stats_data.get('teamName', '') or 
+                          stats_data.get('teamCode', '') or 
+                          'N/A')
+        
         player_type = stats_data.get('player_type', 'skater')
         
         embed = discord.Embed(
