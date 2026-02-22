@@ -10,15 +10,20 @@ A feature-rich Discord bot that responds to specific phrases with GIFs and react
 - Responds to `!mom` command with text
 - Movie lookup via IMDB/OMDB API with the `!movie` command
 - Reminder system that lets users set reminders with the `!remind` command
-- **🎭 Random Daily Emotes**: Bot performs random actions once per day with themes from Discworld, classic horror, and occult literature
+- **!wisdom**: Random Taylor Swift quotes on demand
+- **Random Daily Emotes**: Bot performs random actions once per day with themes from Discworld, classic horror, and occult literature
 
-### 🐾 Florida Panthers Features
+### Florida Panthers Features
 - **Team Overview**: Current standings, record, and next/live game info
-- **🚨 Live Game Monitoring**: Real-time goal notifications, period changes, and game updates
+- **Live Game Monitoring**: Real-time goal notifications, period changes, and game updates
 - **Live Score Updates**: Automatic score change announcements during games
 - **Game Details**: Comprehensive current and upcoming game information
 - **Recent Games**: Last 5 Panthers games with results
 - **Player Quotes**: Random inspirational quotes from Panthers players and coaches
+- **Team Comparison**: Head-to-head stats vs any NHL team
+- **Player Stats**: Look up any NHL player's stats
+- **Playoff Bracket**: Full Stanley Cup playoff bracket tracking
+- **Series Tracking**: Panthers-specific playoff series status
 - **Channel-Based Controls**: Each Discord channel can independently enable/disable live updates
 
 ## Setup
@@ -35,31 +40,47 @@ DISCORD_TOKEN=your_discord_token_here
 OMDB_API_KEY=your_omdb_api_key_here
 ```
 
-2. Configure bot behavior in the `BotConfig` class in `urmom-bot.py`
+2. Configure bot behavior in the `BotConfig` class in `bot/config.py`
 
 ### Building and Running with Docker
 ```bash
 # Build and start the container
-docker-compose up -d
+docker compose up -d
+
+# Rebuild after code changes
+docker compose build && docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop the container
-docker-compose down
+docker compose down
 ```
 
 ## Project Structure
 ```
 .
-├── gifs/                  # Directory for GIF files
+├── bot/                       # Bot module
+│   ├── __init__.py
+│   ├── config.py              # Bot configuration and constants
+│   ├── urmom_bot.py           # Main bot class and command registration
+│   ├── panthers_manager.py    # NHL API integration for Panthers data
+│   ├── panthers_commands.py   # Panthers command handlers
+│   ├── live_monitor.py        # Live game score monitoring
+│   ├── movie_manager.py       # OMDB movie lookup
+│   ├── reminder_manager.py    # Reminder system
+│   ├── team_comparison.py     # Head-to-head team stats
+│   ├── player_stats.py        # NHL player stats lookup
+│   └── playoff_bracket.py     # Playoff bracket tracking
+├── gifs/                      # GIF files (mounted read-only in container)
 │   ├── alot.gif
 │   └── ur-mom.gif
-├── urmom-bot.py          # Main bot code
-├── .env                  # Environment variables
-├── requirements.txt      # Python dependencies
-├── Dockerfile           # Docker build instructions
-└── docker-compose.yml   # Docker Compose configuration
+├── main.py                    # Entrypoint
+├── urmom-bot.py               # Legacy monolith (kept for reference)
+├── .env                       # Environment variables
+├── requirements.txt           # Python dependencies
+├── Dockerfile                 # Docker build instructions
+└── docker-compose.yml         # Docker Compose configuration
 ```
 
 ## Commands
@@ -68,6 +89,9 @@ docker-compose down
 
 #### `!mom`
 A simple command that responds with "what...?"
+
+#### `!wisdom`
+Displays a random Taylor Swift quote.
 
 #### `!movie [title]`
 Searches for movies matching the given title. If multiple matches are found, displays a list with details including actors, director, and studio for selection.
@@ -93,7 +117,7 @@ If replying to another message, the reminder will include that message.
 !remind tomorrow at 9am Team meeting
 ```
 
-### 🐾 Panthers Commands
+### Panthers Commands
 
 #### `!cats`
 Shows comprehensive team overview including:
@@ -118,22 +142,37 @@ Shows the last 5 Panthers games with:
 - Win/Loss result
 - Opponent and home/away status
 
-#### `!cats live [on/off/status]` 🚨 **NEW!**
+#### `!cats vs <team>`
+Head-to-head comparison between the Panthers and any other NHL team. Accepts team names, cities, or abbreviations (e.g., `!cats vs tampa`, `!cats vs TBL`).
+
+#### `!cats player <name>`
+Looks up stats for any NHL player by name.
+
+#### `!cats live [on/off/status]`
 Controls live game updates for the current channel:
 - **`!cats live on`** - Enable real-time score updates, goal notifications, and period changes
 - **`!cats live off`** - Disable live updates for this channel
 - **`!cats live status`** - Check if live updates are enabled and monitoring status
 
 **Live Update Features:**
-- 🚨 **Goal Notifications**: Instant alerts when goals are scored (extra excitement for Panthers goals!)
-- 🏒 **Period Changes**: Notifications when periods start
-- 🎉 **Game Results**: Final score announcements when games end
-- ⚡ **Smart Timing**: Only monitors during game hours, checks every 30 seconds during live games
+- **Goal Notifications**: Instant alerts when goals are scored (extra excitement for Panthers goals!)
+- **Period Changes**: Notifications when periods start
+- **Game Results**: Final score announcements when games end
+- **Smart Timing**: Only monitors during game hours, checks every 30 seconds during live games
+
+#### `!cats bracket`
+Displays the full Stanley Cup playoff bracket.
+
+#### `!cats series`
+Shows the current Panthers playoff series status.
+
+#### `!cats round [number]`
+Shows playoff round summary. Optionally specify a round number (1-4).
 
 #### `!cats help`
 Lists all available Panthers commands with descriptions.
 
-### 🎭 Random Emote Commands
+### Random Emote Commands
 
 #### `!emote test`
 Manually triggers a random emote for testing purposes. The bot will perform a random action with themes inspired by:
@@ -146,31 +185,26 @@ Manually triggers a random emote for testing purposes. The bot will perform a ra
 - *glances nervously over shoulder*
 - *traces a pentagram in the air with deliberate precision*
 
-## 🎭 Random Daily Emotes
+## Random Daily Emotes
 
 The bot includes an entertaining random emote system that adds personality:
 
 ### **Automatic Daily Emotes**
 - Sends one random emote per day at a random time between 8 AM - 11 PM ET
-- Emotes are sent to channels with active live updates enabled
 - Over 100+ unique emotes covering three distinct themes
 
 ### **Themed Content**
-- **🧙 Discworld**: Magical mishaps, wizard problems, and Terry Pratchett-inspired whimsy
-- **🔪 Classic Horror**: Slasher film references, spooky situations, and Friday the 13th vibes  
-- **🔮 Occult**: Ceremonial magic, Aleister Crowley themes, and esoteric practices
-- **✨ Mystical**: Reality-bending and cosmic humor
+- **Discworld**: Magical mishaps, wizard problems, and Terry Pratchett-inspired whimsy
+- **Classic Horror**: Slasher film references, spooky situations, and Friday the 13th vibes
+- **Occult**: Ceremonial magic, Aleister Crowley themes, and esoteric practices
+- **Mystical**: Reality-bending and cosmic humor
 
 ### **Smart Scheduling**
 - Only one emote per day to avoid spam
 - Random timing within active hours (8 AM - 11 PM ET)
-- Prioritizes channels with live updates enabled
 - Fallback to any available channel if needed
 
-### **Testing**
-Use `!emote test` to manually trigger emotes during development and testing.
-
-## 🚨 Live Game Monitoring
+## Live Game Monitoring
 
 The bot includes an advanced live game monitoring system that:
 
@@ -180,10 +214,10 @@ The bot includes an advanced live game monitoring system that:
 - Tracks score changes, period transitions, and game endings
 
 ### **Smart Notifications**
-- **Panthers Goals**: `🚨 PANTHERS GOAL! 🚨` with enhanced formatting
+- **Panthers Goals**: `PANTHERS GOAL!` with enhanced formatting
 - **Opponent Goals**: Standard goal notification
-- **Period Changes**: `🏒 Period 2 Starting`
-- **Game Endings**: `🎉 PANTHERS WIN!` or `😞 Game Over`
+- **Period Changes**: `Period 2 Starting`
+- **Game Endings**: `PANTHERS WIN!` or `Game Over`
 
 ### **Channel Management**
 - Each Discord channel controls its own live update preferences
@@ -192,14 +226,14 @@ The bot includes an advanced live game monitoring system that:
 
 ### **Example Live Updates**
 ```
-🚨 PANTHERS GOAL! 🚨
+PANTHERS GOAL!
 FLA 2 - 1 CAR
 Period 2 - 15:23
 
-🏒 Period 3 Starting
+Period 3 Starting
 FLA 2 - 1 CAR
 
-🎉 PANTHERS WIN! 🎉
+PANTHERS WIN!
 Final: FLA 3 - 1 CAR
 ```
 
@@ -212,6 +246,7 @@ The bot uses the official NHL API to provide:
 - Team standings and records
 - Schedule information
 - Player and team data
+- Playoff bracket and series data
 
 **No API key required** - the NHL API is free to use.
 
@@ -221,7 +256,7 @@ Used for movie lookups. Requires a free API key from [OMDB API](http://www.omdba
 ## Adding New Features
 
 ### For new commands:
-Add them with the `@self.command()` decorator in the `add_commands()` method:
+Add them with the `@self.command()` decorator in the `add_commands()` method in `bot/urmom_bot.py`:
 
 ```python
 @self.command(name='newcommand')
@@ -231,7 +266,7 @@ async def new_command(ctx):
 ```
 
 ### For configuration options:
-Add them to the `BotConfig` class:
+Add them to the `BotConfig` class in `bot/config.py`:
 
 ```python
 class BotConfig:
@@ -240,40 +275,19 @@ class BotConfig:
 ```
 
 ### For new automatic responses:
-Add them in the `on_message` event handler:
+Add them in the `on_message` event handler in `bot/urmom_bot.py`:
 
 ```python
 if "some phrase" in message.content.lower():
     await message.channel.send("Your response here")
 ```
 
-### Expanding Panthers Features
-
-#### Adding More Quotes
-Add new quotes to the `PANTHERS_QUOTES` list in the `BotConfig` class:
-
-```python
-PANTHERS_QUOTES = [
-    "\"Your new quote here.\" - Player Name",
-    # ... existing quotes
-]
-```
-
-#### Adding New Panthers Commands
-Follow the pattern established in the `cats_command` function to add new subcommands.
-
-#### Customizing Live Updates
-Modify the live monitoring behavior in the `live_game_monitor()` and related methods:
-- Adjust monitoring frequency
-- Add new types of notifications
-- Customize message formatting
-- Add team-specific celebrations
-
 ## Background Tasks
 
 The bot runs several background tasks:
 - **Reminder System**: Checks for due reminders every 10 seconds
 - **Live Game Monitor**: Monitors Panthers games every 30 seconds during game hours
+- **Random Emotes**: Checks hourly during active hours for daily emote
 - **Smart Scheduling**: Reduces API calls during off-hours to improve performance
 
 ## Error Handling
@@ -311,15 +325,3 @@ When adding new features:
 ## License
 
 This project is for personal/educational use.
-
----
-
-## 🏒 Perfect for Panthers Fans!
-
-This bot is specifically designed for Florida Panthers fans who want:
-- **Real-time playoff updates** during Conference Finals and Stanley Cup runs
-- **Comprehensive team information** at their fingertips
-- **Customizable notifications** that don't spam unwilling channels
-- **Smart, hockey-aware features** that understand the game
-
-**Ready for Game 5!** 🐾🚨
