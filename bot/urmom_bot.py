@@ -40,6 +40,11 @@ class UrmomBot(commands.Bot):
         
         # Background tasks
         self.reminder_check_task = None
+        self.emote_check_task = None
+        
+        # Random emote system
+        self.last_emote_date = None
+        self.emote_sent_today = False
         
         # Register commands and events
         self.add_commands()
@@ -47,6 +52,7 @@ class UrmomBot(commands.Bot):
     async def setup_hook(self):
         """Set up background tasks when the bot is ready"""
         self.reminder_check_task = self.loop.create_task(self.reminder_check_loop())
+        self.emote_check_task = self.loop.create_task(self.random_emote_loop())
         self.live_monitor.start_monitoring()
     
     async def reminder_check_loop(self):
@@ -55,6 +61,57 @@ class UrmomBot(commands.Bot):
         while not self.is_closed():
             await self.reminder_manager.check_reminders()
             await asyncio.sleep(self.config.REMINDER_CHECK_INTERVAL)
+    
+    async def random_emote_loop(self):
+        """Background task to send random emotes once per day"""
+        await self.wait_until_ready()
+        logger.info("🎭 Random emote scheduler started!")
+        
+        while not self.is_closed():
+            try:
+                import datetime
+                current_time = datetime.datetime.now(self.config.TIMEZONE)
+                current_date = current_time.date()
+                
+                # Reset daily flag if it's a new day
+                if self.last_emote_date != current_date:
+                    self.emote_sent_today = False
+                    self.last_emote_date = current_date
+                
+                # Check if we should send an emote today (8 AM - 11 PM)
+                if (not self.emote_sent_today and 
+                    8 <= current_time.hour <= 23):
+                    
+                    # Random chance to send emote this hour (1 in 8 chance per check)
+                    import random
+                    if random.randint(1, 8) == 1:
+                        await self.send_random_emote_to_channels()
+                        self.emote_sent_today = True
+                
+                # Check every hour
+                await asyncio.sleep(3600)
+                
+            except Exception as e:
+                logger.error(f"Error in random emote loop: {e}")
+                await asyncio.sleep(3600)  # Wait an hour if there's an error
+    
+    async def send_random_emote_to_channels(self):
+        """Send a random emote to channels"""
+        try:
+            import random
+            # Get a random emote
+            emote = random.choice(self.config.RANDOM_EMOTES)
+            
+            # Find any channel we can access
+            for guild in self.guilds:
+                for channel in guild.text_channels:
+                    if channel.permissions_for(guild.me).send_messages:
+                        await channel.send(f"*{emote}*")
+                        logger.info(f"Sent random daily emote to channel {channel.id}: {emote}")
+                        return  # Only send to one channel
+                        
+        except Exception as e:
+            logger.error(f"Error sending random emote: {e}")
     
     def add_commands(self):
         @self.command(name='mom')
@@ -94,6 +151,13 @@ class UrmomBot(commands.Bot):
             else:
                 await ctx.send("Unknown command. Use `!cats`, `!cats game`, `!cats live`, `!cats vs <team>`, `!cats player <name>`, `!cats bracket`, `!cats series`, or `!cats help`")
         
+        @self.command(name='wisdom')
+        async def wisdom_command(ctx):
+            """Random Taylor Swift quote"""
+            import random
+            quote = random.choice(self.config.TAYLOR_SWIFT_QUOTES)
+            await ctx.send(quote)
+
         @self.command(name='movie')
         async def movie_command(ctx, *, query=None):
             """Look up a movie on IMDB"""
@@ -183,6 +247,18 @@ class UrmomBot(commands.Bot):
             # Format the confirmation time in EST
             est_time = reminder_time.strftime("%I:%M %p %Z on %b %d, %Y")
             await ctx.send(f"I'll remind you at {est_time}!")
+        
+        @self.command(name='emote')
+        async def emote_command(ctx, action=None):
+            """Test the random emote system"""
+            if action and action.lower() == 'test':
+                import random
+                # Send a random emote for testing
+                emote = random.choice(self.config.RANDOM_EMOTES)
+                await ctx.send(f"*{emote}*")
+                logger.info(f"Manual emote triggered by {ctx.author}: {emote}")
+            else:
+                await ctx.send("Usage: `!emote test` - Trigger a random emote for testing")
                 
         @self.event
         async def on_ready():

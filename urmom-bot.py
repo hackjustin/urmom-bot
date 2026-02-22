@@ -66,6 +66,147 @@ class BotConfig:
         "\"The chemistry on this team is unreal.\" - Sam Bennett",
         "\"We're not done yet. We want more.\" - Paul Maurice (Head Coach)"
     ]
+    
+    # Random emotes covering Discworld, horror, and occult themes
+    RANDOM_EMOTES = [
+        # Discworld-inspired emotes
+        "adjusts a slightly bent wizard hat",
+        "mutters about the importance of proper footnotes",
+        "checks if anyone is watching, then discretely counts on fingers",
+        "peers suspiciously at a small piece of cheese",
+        "straightens up and tries to look dignified",
+        "fumbles with a worn leather-bound book",
+        "glances around nervously for any sign of the Auditors",
+        "adjusts robes that seem to have a mind of their own",
+        "looks thoughtfully at the sky, as if expecting it to fall",
+        "checks pockets for spare change and finds only lint",
+        "mutters something about the reliability of gargoyles",
+        "peers over invisible reading glasses",
+        "tries to look wise while clearly having no idea what's happening",
+        "adjusts a pointy hat that keeps sliding sideways",
+        "looks around for a conveniently placed orangutan",
+        "checks the time on a watch that runs backwards",
+        "mutters about the difficulty of maintaining a proper beard",
+        "shuffles through a deck of cards that seem to shuffle themselves",
+        "glances nervously at shadows that move independently",
+        "adjusts spectacles and peers at something extremely small",
+        "looks for a turtle to stand on",
+        "checks if reality is still properly attached",
+        "mutters about the unreliability of magic",
+        "peers into a crystal ball that shows only static",
+        "adjusts a collar that seems uncomfortably tight",
+        "looks around for Death, just in case",
+        "checks if the Luggage is following at a safe distance",
+        "mutters about the proper way to fold space",
+        "glances at a timepiece that measures L-space",
+        "adjusts robes and tries to look mysterious",
+        "peers at a small imp that may or may not be there",
+        "checks if anyone noticed the small magical accident",
+        "looks thoughtfully at a banana, as if it holds cosmic secrets",
+        "adjusts a badge that reads 'Wizzard' (misspelled)",
+        "mutters about the difficulty of herding cats... or students",
+        
+        # Horror/slasher-inspired emotes
+        "glances nervously over shoulder",
+        "checks if all the doors are locked",
+        "peers suspiciously into dark corners",
+        "adjusts a hockey mask slightly",
+        "sharpens something metallic with deliberate care",
+        "looks out the window at the suspiciously quiet street",
+        "checks the basement door... it's still locked, right?",
+        "glances at the old mirror, half-expecting something else to look back",
+        "listens intently to creaking sounds from upstairs",
+        "checks the phone line... still dead",
+        "peers at old photographs that seem to move when not looking directly",
+        "adjusts a chainsaw chain with mechanical precision",
+        "looks under the bed, just to be sure",
+        "checks if the car will actually start this time",
+        "glances at the old camp sign, weathered and ominous",
+        "peers into the fog that shouldn't be there",
+        "checks the calendar... Friday the 13th again",
+        "looks at a kitchen knife with professional interest",
+        "glances at the old Ouija board in the corner",
+        "checks if the power is still on",
+        "peers at shadows that seem too long for the light source",
+        "looks at a machete with nostalgic fondness",
+        "checks if anyone else heard that scream",
+        "glances at the old abandoned summer camp across the lake",
+        "adjusts a freddy sweater with pride",
+        "looks at the old VHS collection with satisfaction",
+        "peers into a well that's definitely deeper than it should be",
+        "checks the time... 3 AM, naturally",
+        "glances at a music box that plays by itself",
+        "looks at the old corn maze with professional appreciation",
+        "peers at a clown doll that definitely wasn't there before",
+        "checks if the babysitter remembered to lock all the windows",
+        "glances at the old psychiatric hospital on the hill",
+        "looks at a ouija board pointer that moved on its own",
+        "peers into a bathroom mirror, counting reflections",
+        
+        # Occult/Crowley-inspired emotes
+        "traces a pentagram in the air with deliberate precision",
+        "adjusts a ceremonial robe with occult symbols",
+        "peers into a scrying bowl filled with dark water",
+        "mutters an incantation in ancient Enochian",
+        "checks the lunar calendar for the next significant date",
+        "adjusts candles in a precise magical arrangement",
+        "peers at tarot cards that seem to glow faintly",
+        "traces sigils on a dusty grimoire",
+        "checks the alignment of ceremonial daggers",
+        "mutters about the difficulty of proper ritual timing",
+        "adjusts a thelemic ankh pendant",
+        "peers into a crystal that reflects impossible colors",
+        "checks if the ritual circle is properly sealed",
+        "adjusts robes bearing the Tree of Life",
+        "mutters about the reliability of astral projection",
+        "peers at a mandala that seems to shift and breathe",
+        "checks ancient texts for proper invocation syntax",
+        "adjusts a ceremonial crown with occult significance",
+        "traces the paths of the Qabalah in the air",
+        "peers into a mirror that shows more than reflections",
+        "mutters about the complexity of gematria calculations",
+        "adjusts ritual implements with ceremonial precision",
+        "checks if the incense is producing the correct colored smoke",
+        "peers at hieroglyphic inscriptions that seem to move",
+        "traces the seal of Solomon with practiced movements",
+        "adjusts a ritual crown bearing the Eye of Horus",
+        "mutters about the proper pronunciation of divine names",
+        "peers into a cauldron of bubbling, luminescent liquid",
+        "checks astronomical charts for planetary influences",
+        "adjusts a ceremonial sword with esoteric engravings",
+        "traces magical formulae in ancient alphabets",
+        "peers at a compass that points to magnetic and spiritual north",
+        "mutters about the challenges of maintaining magical equilibrium",
+        "adjusts a ritual mask bearing symbols of transformation",
+        "checks if the ethereal energies are properly balanced",
+        
+        # General mystical/quirky emotes
+        "adjusts reality slightly to the left",
+        "peers at something that probably shouldn't exist",
+        "checks if the laws of physics are still working",
+        "mutters about the unreliability of dimensional boundaries",
+        "glances at a clock that shows thirteen o'clock",
+        "adjusts a monocle that reveals hidden truths",
+        "peers at footprints that lead in impossible directions",
+        "checks if the universe is still expanding at the correct rate",
+        "mutters about the difficulty of maintaining proper cosmic balance",
+        "adjusts a hat that exists in more dimensions than strictly necessary",
+        "looks at a map of places that probably don't exist",
+        "checks a compass that points to 'somewhere else'",
+        "peers at a book whose pages turn themselves",
+        "mutters about the complexity of interdimensional filing systems",
+        "adjusts spectacles that show things as they really are",
+        "glances at shadows that fall upward",
+        "checks if gravity is still working as advertised",
+        "peers at a photograph that shows the future",
+        "mutters about the unreliability of cause and effect",
+        "adjusts a watch that measures emotional time"
+    ]
+    
+    # Emote scheduling configuration
+    EMOTE_CHECK_INTERVAL = 3600  # Check every hour
+    EMOTE_MIN_HOUR = 8  # Earliest hour to emote (8 AM)
+    EMOTE_MAX_HOUR = 23  # Latest hour to emote (11 PM)
 
 class Reminder:
     """Class to represent a reminder"""
@@ -458,6 +599,10 @@ class UrmomBot(commands.Bot):
         self.panthers_manager = PanthersManager(self)
         self.movie_selections = {}
         
+        # Random emote system
+        self.last_emote_date = None  # Track when we last emoted
+        self.emote_sent_today = False
+        
         # Live score monitoring
         self.live_channels = set()  # Channels that want live updates
         self.last_game_state = {}  # Store last known game state
@@ -468,11 +613,14 @@ class UrmomBot(commands.Bot):
         
         # Start background tasks
         self.reminder_check_task = None
+        self.emote_check_task = None
     
     async def setup_hook(self):
         """Set up background tasks when the bot is ready"""
         self.reminder_check_task = self.loop.create_task(self.reminder_check_loop())
         self.live_monitor_task = self.loop.create_task(self.live_game_monitor())
+        # Temporarily disable emote task to debug command registration
+        # self.emote_check_task = self.loop.create_task(self.random_emote_loop())
     
     async def reminder_check_loop(self):
         """Background task to check for due reminders"""
@@ -516,6 +664,67 @@ class UrmomBot(commands.Bot):
             except Exception as e:
                 logger.error(f"Error in live game monitor: {e}")
                 await asyncio.sleep(60)  # Wait longer if there's an error
+    
+    async def random_emote_loop(self):
+        """Background task to send random emotes once per day"""
+        await self.wait_until_ready()
+        logger.info("🎭 Random emote scheduler started!")
+        
+        while not self.is_closed():
+            try:
+                current_time = datetime.datetime.now(self.config.TIMEZONE)
+                current_date = current_time.date()
+                
+                # Reset daily flag if it's a new day
+                if self.last_emote_date != current_date:
+                    self.emote_sent_today = False
+                    self.last_emote_date = current_date
+                
+                # Check if we should send an emote today
+                if (not self.emote_sent_today and 
+                    self.config.EMOTE_MIN_HOUR <= current_time.hour <= self.config.EMOTE_MAX_HOUR):
+                    
+                    # Random chance to send emote this hour (1 in 8 chance per check during active hours)
+                    if random.randint(1, 8) == 1:
+                        await self.send_random_emote_to_channels()
+                        self.emote_sent_today = True
+                
+                # Check every hour
+                await asyncio.sleep(self.config.EMOTE_CHECK_INTERVAL)
+                
+            except Exception as e:
+                logger.error(f"Error in random emote loop: {e}")
+                await asyncio.sleep(3600)  # Wait an hour if there's an error
+    
+    async def send_random_emote_to_channels(self):
+        """Send a random emote to channels that have had recent activity"""
+        try:
+            # Get a random emote
+            emote = random.choice(self.config.RANDOM_EMOTES)
+            
+            # Send to channels with live updates enabled (they're active)
+            if self.live_channels:
+                for channel_id in list(self.live_channels):
+                    try:
+                        channel = self.get_channel(channel_id)
+                        if channel:
+                            await channel.send(f"*{emote}*")
+                            logger.info(f"Sent random emote to channel {channel_id}: {emote}")
+                            break  # Only send to one channel to avoid spam
+                    except Exception as e:
+                        logger.warning(f"Failed to send emote to channel {channel_id}: {e}")
+                        self.live_channels.discard(channel_id)
+            else:
+                # Fallback: try to find any channel we can access
+                for guild in self.guilds:
+                    for channel in guild.text_channels:
+                        if channel.permissions_for(guild.me).send_messages:
+                            await channel.send(f"*{emote}*")
+                            logger.info(f"Sent random emote to fallback channel {channel.id}: {emote}")
+                            return
+                        
+        except Exception as e:
+            logger.error(f"Error sending random emote: {e}")
     
     async def check_for_score_changes(self, current_game):
         """Check if the score has changed and announce updates"""
@@ -1188,6 +1397,22 @@ class UrmomBot(commands.Bot):
                         
                         await ctx.send(selection_msg)
         
+        @self.command(name='test')
+        async def test_command(ctx):
+            """Basic test command"""
+            await ctx.send("Test command works!")
+        
+        @self.command(name='emote')
+        async def emote_command(ctx, action=None):
+            """Test the random emote system"""
+            if action and action.lower() == 'test':
+                # Send a random emote for testing
+                emote = random.choice(self.config.RANDOM_EMOTES)
+                await ctx.send(f"*{emote}*")
+                logger.info(f"Manual emote triggered by {ctx.author}: {emote}")
+            else:
+                await ctx.send("Usage: `!emote test` - Trigger a random emote for testing")
+        
         @self.command(name='remind')
         async def remind_command(ctx, *args):
             """Set a reminder"""
@@ -1400,6 +1625,8 @@ def main():
         bot.reminder_check_task.cancel()
     if bot.live_monitor_task:
         bot.live_monitor_task.cancel()
+    if bot.emote_check_task:
+        bot.emote_check_task.cancel()
 
 if __name__ == "__main__":
     main()

@@ -10,6 +10,7 @@ A feature-rich Discord bot that responds to specific phrases with GIFs and react
 - Responds to `!mom` command with text
 - Movie lookup via IMDB/OMDB API with the `!movie` command
 - Reminder system that lets users set reminders with the `!remind` command
+- **🎭 Random Daily Emotes**: Bot performs random actions once per day with themes from Discworld, classic horror, and occult literature
 
 ### 🐾 Florida Panthers Features
 - **Team Overview**: Current standings, record, and next/live game info
@@ -131,6 +132,43 @@ Controls live game updates for the current channel:
 
 #### `!cats help`
 Lists all available Panthers commands with descriptions.
+
+### 🎭 Random Emote Commands
+
+#### `!emote test`
+Manually triggers a random emote for testing purposes. The bot will perform a random action with themes inspired by:
+- **Discworld**: Terry Pratchett-inspired magical and whimsical actions
+- **Classic Horror**: Slasher film and horror movie references
+- **Occult**: Aleister Crowley and ceremonial magic themes
+
+**Example emotes:**
+- *adjusts a slightly bent wizard hat*
+- *glances nervously over shoulder*
+- *traces a pentagram in the air with deliberate precision*
+
+## 🎭 Random Daily Emotes
+
+The bot includes an entertaining random emote system that adds personality:
+
+### **Automatic Daily Emotes**
+- Sends one random emote per day at a random time between 8 AM - 11 PM ET
+- Emotes are sent to channels with active live updates enabled
+- Over 100+ unique emotes covering three distinct themes
+
+### **Themed Content**
+- **🧙 Discworld**: Magical mishaps, wizard problems, and Terry Pratchett-inspired whimsy
+- **🔪 Classic Horror**: Slasher film references, spooky situations, and Friday the 13th vibes  
+- **🔮 Occult**: Ceremonial magic, Aleister Crowley themes, and esoteric practices
+- **✨ Mystical**: Reality-bending and cosmic humor
+
+### **Smart Scheduling**
+- Only one emote per day to avoid spam
+- Random timing within active hours (8 AM - 11 PM ET)
+- Prioritizes channels with live updates enabled
+- Fallback to any available channel if needed
+
+### **Testing**
+Use `!emote test` to manually trigger emotes during development and testing.
 
 ## 🚨 Live Game Monitoring
 

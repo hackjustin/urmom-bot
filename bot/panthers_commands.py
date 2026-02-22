@@ -328,6 +328,8 @@ class PanthersCommands:
             game_time = current_game.get('startTimeUTC', '')
             if game_time:
                 try:
+                    utc_time = datetime.datetime.fromisoformat(game_time.replace('Z', '+00:00'))
+                    est_time = utc_time.astimezone(pytz.timezone('US/Eastern'))
                     formatted_time = est_time.strftime('%I:%M %p ET')
                     embed.add_field(name="Game Time", value=formatted_time, inline=True)
                 except ValueError:
