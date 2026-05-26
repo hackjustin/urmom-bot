@@ -12,6 +12,7 @@ from bot.live_monitor import LiveGameMonitor
 from bot.panthers_commands import PanthersCommands
 from bot.player_stats import PlayerStatsManager
 from bot.playoff_bracket import PlayoffBracketManager  # Add this import
+from bot.chuck_manager import ChuckManager
 
 logger = logging.getLogger('urmom-bot')
 
@@ -29,6 +30,7 @@ class UrmomBot(commands.Bot):
         self.movie_manager = MovieManager(self.config)
         self.player_stats_manager = PlayerStatsManager(self.config)
         self.bracket_manager = PlayoffBracketManager(self.config)  # Add this line
+        self.chuck_manager = ChuckManager()
         self.live_monitor = LiveGameMonitor(self, self.panthers_manager, self.config)
         self.panthers_commands = PanthersCommands(
             self.config, 
@@ -157,6 +159,11 @@ class UrmomBot(commands.Bot):
             import random
             quote = random.choice(self.config.TAYLOR_SWIFT_QUOTES)
             await ctx.send(quote)
+
+        @self.command(name='chuck')
+        async def chuck_command(ctx, *, subcommand=None):
+            """Random Chuck Norris joke"""
+            await self.chuck_manager.handle_chuck(ctx, subcommand)
 
         @self.command(name='movie')
         async def movie_command(ctx, *, query=None):
