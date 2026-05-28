@@ -208,6 +208,34 @@ class BotConfig:
         "\"My confidence is easy to shake. I am very well aware of all of my flaws. I am aware of all the insecurities that I have.\" - Taylor Swift",
     ]
 
+    # Hellraiser quotes
+    HELLRAISER_QUOTES = [
+        "Down the dark decades of your pain this will seem like a memory of Heaven.",
+        "Personally I prefer pain.",
+        "Your suffering will be legendary, even in Hell!",
+        "We have all eternity to know your flesh.",
+        "Do I look like someone who cares what God thinks?",
+        "Oh, no tears, please. It's a waste of good suffering.",
+        "I'm going to enjoy making you bleed. And I'm going to enjoy making you enjoy it.",
+        "We have such sights to show you",
+        "I did coke with her and I had sex with her",
+        "There is no good. There is no evil. There is only flesh.",
+        "Save your tears. I'll reap your sorrow slowly. I have centuries to discover the things that make you whimper.",
+        "What you think of as pain is only a shadow. Pain has a face. Allow me to show it to you. Gentlemen, I... Am... Pain.",
+        "Human dreams... such fertile ground for the seeds of torment.",
+        "Ah, the eternal refrain of humanity. Pleading ignorance, begging for mercy.",
+        "This is my body. This is my blood. Happy are they who come to my supper.",
+        "We'll tear your soul apart!",
+        "The box. You opened it. We came. Now you must come with us, taste our pleasures.",
+        "Time to play…",
+        "There is a secret song at the center of the world, and its sound is like razors through flesh.",
+        "Welcome to the worst nightmare of all… reality!",
+        "Dreams are fleeting. Only nightmares last forever!",
+        "You should be very careful what you wish for. It just might come true!",
+        "Birth…is pain. Each nail...each new square of flesh...wrenches you further from the fleshy existence you knew before.",
+        "Look at me. I'm all you know. Forged in agony and pain. I welcome an eternity of anguish",
+    ]
+
     # Panthers player quotes
     PANTHERS_QUOTES = [
         "\"We're just taking it one game at a time.\" - Aleksander Barkov",
