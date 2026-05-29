@@ -160,6 +160,14 @@ class UrmomBot(commands.Bot):
             quote = random.choice(self.config.TAYLOR_SWIFT_QUOTES)
             await ctx.send(quote)
 
+        @self.command(name='hell')
+        async def hell_command(ctx):
+            """Random Hellraiser quote"""
+            import random
+            quote = random.choice(self.config.HELLRAISER_QUOTES)
+            await ctx.send(quote)
+
+
         @self.command(name='chuck')
         async def chuck_command(ctx, *, subcommand=None):
             """Random Chuck Norris joke"""
